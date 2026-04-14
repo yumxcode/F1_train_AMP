@@ -57,6 +57,15 @@ class X1DHStandCfg(LeggedRobotCfg):
         pos_limit = 1.0
         vel_limit = 1.0
         torque_limit = 0.85
+        # [OMA] design-20260414-001 — exporter URDF limits are placeholders, use conservative locomotion windows.
+        manual_joint_clip_names = [
+            "left_hip_pitch_joint", "left_hip_roll_joint", "left_hip_yaw_joint",
+            "left_knee_pitch_joint", "left_ankle_pitch_joint", "left_ankle_roll_joint",
+            "right_hip_pitch_joint", "right_hip_roll_joint", "right_hip_yaw_joint",
+            "right_knee_pitch_joint", "right_ankle_pitch_joint", "right_ankle_roll_joint",
+        ]
+        manual_joint_clip_lower = [-0.90, -0.35, -0.45, 0.00, -0.55, -0.30, -0.90, -0.35, -0.45, 0.00, -0.55, -0.30]
+        manual_joint_clip_upper = [0.70, 0.35, 0.45, 1.45, 0.45, 0.30, 0.70, 0.35, 0.45, 1.45, 0.45, 0.30]
 
 
     class asset(LeggedRobotCfg.asset):
@@ -144,13 +153,15 @@ class X1DHStandCfg(LeggedRobotCfg):
         # PD Drive parameters:
         control_type = 'P'
 
-        stiffness = {'hip_pitch_joint': 30, 'hip_roll_joint': 40,'hip_yaw_joint': 35,
-                     'knee_pitch_joint': 100, 'ankle_pitch_joint': 35, 'ankle_roll_joint': 35}
-        damping = {'hip_pitch_joint': 3, 'hip_roll_joint': 3.0,'hip_yaw_joint': 4, 
-                   'knee_pitch_joint': 10, 'ankle_pitch_joint': 0.5, 'ankle_roll_joint': 0.5}
+        stiffness = {'hip_pitch_joint': 40, 'hip_roll_joint': 40,'hip_yaw_joint': 32,
+                     'knee_pitch_joint': 110, 'ankle_pitch_joint': 45, 'ankle_roll_joint': 32}
+        damping = {'hip_pitch_joint': 4.0, 'hip_roll_joint': 3.2,'hip_yaw_joint': 3.0,
+                   'knee_pitch_joint': 10.0, 'ankle_pitch_joint': 1.2, 'ankle_roll_joint': 1.0}
 
         # action scale: target angle = actionScale * action + defaultAngle
-        action_scale = 0.5
+        action_scale = 0.25
+        # [OMA] design-20260414-001 — per-joint scaling is implemented in x1_dh_stand_env.step
+        action_scale_vector = [0.35, 0.20, 0.18, 0.35, 0.25, 0.20, 0.35, 0.20, 0.18, 0.35, 0.25, 0.20]
         # decimation: Number of control action updates @ sim DT per policy DT
         decimation = 10  # 50hz 100hz
 
@@ -175,7 +186,7 @@ class X1DHStandCfg(LeggedRobotCfg):
 
     class domain_rand(LeggedRobotCfg.domain_rand):
         randomize_friction = True
-        friction_range = [0.2, 1.3]
+        friction_range = [0.2, 2.2]
         restitution_range = [0.0, 0.4]
 
         # push
@@ -183,29 +194,29 @@ class X1DHStandCfg(LeggedRobotCfg):
         push_interval_s = 4 # every this second, push robot
         update_step = 2000 * 24 # after this count, increase push_duration index
         push_duration = [0, 0.05, 0.1, 0.15, 0.2, 0.25] # increase push duration during training
-        max_push_vel_xy = 0.2
-        max_push_ang_vel = 0.2
+        max_push_vel_xy = 0.3
+        max_push_ang_vel = 0.3
 
         randomize_base_mass = True
-        added_mass_range = [-3, 3] # base mass rand range, base mass is all fix link sum mass
+        added_mass_range = [-5, 5] # base mass rand range, base mass is all fix link sum mass
 
         randomize_com = True
-        com_displacement_range = [[-0.05, 0.05],
-                                  [-0.05, 0.05],
+        com_displacement_range = [[-0.02, 0.02],
+                                  [-0.015, 0.015],
                                   [-0.05, 0.05]]
 
         randomize_gains = True
-        stiffness_multiplier_range = [0.8, 1.2]  # Factor
-        damping_multiplier_range = [0.8, 1.2]    # Factor
+        stiffness_multiplier_range = [0.85, 1.15]  # Factor
+        damping_multiplier_range = [0.85, 1.15]    # Factor
 
         randomize_torque = True
-        torque_multiplier_range = [0.8, 1.2]
+        torque_multiplier_range = [0.9, 1.1]
 
         randomize_link_mass = True
         added_link_mass_range = [0.9, 1.1]
 
         randomize_motor_offset = True
-        motor_offset_range = [-0.035, 0.035] # Offset to add to the motor angles
+        motor_offset_range = [-0.025, 0.025] # Offset to add to the motor angles
         
         randomize_joint_friction = True
         randomize_joint_friction_each_joint = False
@@ -252,12 +263,12 @@ class X1DHStandCfg(LeggedRobotCfg):
         add_lag = True
         randomize_lag_timesteps = True
         randomize_lag_timesteps_perstep = False
-        lag_timesteps_range = [5, 40]
+        lag_timesteps_range = [0, 12]
         
         add_dof_lag = True
         randomize_dof_lag_timesteps = True
         randomize_dof_lag_timesteps_perstep = False
-        dof_lag_timesteps_range = [0, 40]
+        dof_lag_timesteps_range = [0, 12]
         
         add_dof_pos_vel_lag = False
         randomize_dof_pos_lag_timesteps = False
@@ -270,7 +281,7 @@ class X1DHStandCfg(LeggedRobotCfg):
         add_imu_lag = False
         randomize_imu_lag_timesteps = True
         randomize_imu_lag_timesteps_perstep = False
-        imu_lag_timesteps_range = [1, 10]
+        imu_lag_timesteps_range = [0, 8]
         
         randomize_coulomb_friction = True
         joint_coulomb_range = [0.1, 0.9]
@@ -278,26 +289,26 @@ class X1DHStandCfg(LeggedRobotCfg):
         
     class commands(LeggedRobotCfg.commands):
         curriculum = True
-        max_curriculum = 1.5
+        max_curriculum = 1.2
         # Vers: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         num_commands = 4
-        resampling_time = 25.  # time before command are changed[s]
-        gait = ["walk_omnidirectional","stand","walk_omnidirectional"] # gait type during training
+        resampling_time = 20.  # time before command are changed[s]
+        gait = ["walk_sagittal","stand","walk_sagittal"] # gait type during training
         # proportion during whole life time
-        gait_time_range = {"walk_sagittal": [2,6],
+        gait_time_range = {"walk_sagittal": [5,8],
                            "walk_lateral": [2,6],
                            "rotate": [2,3],
                            "stand": [2,3],
-                           "walk_omnidirectional": [4,6]}
+                           "walk_omnidirectional": [3,5]}
 
         heading_command = False  # if true: compute ang vel command from heading error
         stand_com_threshold = 0.05 # if (lin_vel_x, lin_vel_y, ang_vel_yaw).norm < this, robot should stand
         sw_switch = True # use stand_com_threshold or not
 
         class ranges:
-            lin_vel_x = [-0.4, 1.2] # min max [m/s] 
-            lin_vel_y = [-0.4, 0.4]   # min max [m/s]
-            ang_vel_yaw = [-0.6, 0.6]    # min max [rad/s]
+            lin_vel_x = [0.4, 1.2] # min max [m/s]
+            lin_vel_y = [-0.15, 0.15]   # min max [m/s]
+            ang_vel_yaw = [-0.3, 0.3]    # min max [rad/s]
             heading = [-3.14, 3.14]
 
     class rewards:
@@ -310,10 +321,12 @@ class X1DHStandCfg(LeggedRobotCfg):
 
         # final_swing_joint_pos = final_swing_joint_delta_pos + default_pos
         final_swing_joint_delta_pos = [0.25, 0.05, -0.11, 0.35, -0.16, 0.0, -0.25, -0.05, 0.11, 0.35, -0.16, 0.0]
-        target_feet_height = 0.03 
-        target_feet_height_max = 0.06
+        target_feet_height = 0.04
+        target_feet_height_max = 0.07
         feet_to_ankle_distance = 0.041
-        cycle_time = 0.7
+        cycle_time = 0.64
+        stride_length_target = 0.36
+        toe_scuff_height = 0.035
         # if true negative total rewards are clipped at zero (avoids early termination problems)
         only_positive_rewards = True
         # tracking reward = exp(-error*sigma)
@@ -322,21 +335,23 @@ class X1DHStandCfg(LeggedRobotCfg):
         
         class scales:
             ref_joint_pos = 2.2
-            feet_clearance = 1.
-            feet_contact_number = 2.0
+            feet_clearance = 0.35
+            feet_contact_number = 0.8
             # gait
             feet_air_time = 1.2
-            foot_slip = -0.1
+            foot_slip = -0.25
             feet_distance = 0.2
             knee_distance = 0.2
             # contact 
             feet_contact_forces = -0.01
             # vel tracking
-            tracking_lin_vel = 1.8
-            tracking_ang_vel = 1.1
+            tracking_lin_vel = 2.5
+            tracking_ang_vel = 0.6
             vel_mismatch_exp = 0.5  # lin_z; ang x,y
-            low_speed = 0.2
-            track_vel_hard = 0.5
+            low_speed = 1.0
+            track_vel_hard = 0.8
+            toe_scuff = -0.8
+            stride_length = 0.25
             # base pos
             default_joint_pos = 1.0
             orientation = 1.
@@ -344,7 +359,7 @@ class X1DHStandCfg(LeggedRobotCfg):
             base_height = 0.2
             base_acc = 0.2
             # energy
-            action_smoothness = -0.002
+            action_smoothness = -0.01
             torques = -8e-9
             dof_vel = -2e-8
             dof_acc = -1e-7

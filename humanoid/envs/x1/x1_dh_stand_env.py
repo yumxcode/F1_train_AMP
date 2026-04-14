@@ -114,7 +114,46 @@ class X1DHStandEnv(LeggedRobot):
         super().__init__(cfg, sim_params, physics_engine, sim_device, headless)
         self.last_feet_z = self.cfg.rewards.feet_to_ankle_distance
         self.feet_height = torch.zeros((self.num_envs, 2), device=self.device)
-        self.ref_dof_pos = torch.zeros((self.num_envs, self.num_actions), device=self.device)      
+        self.ref_dof_pos = torch.zeros((self.num_envs, self.num_actions), device=self.device)
+        # [OMA] design-20260414-001 — use conservative locomotion limits instead of exporter placeholders.
+        self._apply_manual_joint_limits()
+        self._init_action_scaling()
+
+    def _apply_manual_joint_limits(self):
+        if not hasattr(self.cfg.safety, "manual_joint_clip_names"):
+            return
+        name_to_idx = {name: idx for idx, name in enumerate(self.dof_names)}
+        lower = torch.tensor(self.cfg.safety.manual_joint_clip_lower, device=self.device, dtype=torch.float)
+        upper = torch.tensor(self.cfg.safety.manual_joint_clip_upper, device=self.device, dtype=torch.float)
+        for joint_idx, joint_name in enumerate(self.cfg.safety.manual_joint_clip_names):
+            if joint_name not in name_to_idx:
+                continue
+            dof_idx = name_to_idx[joint_name]
+            self.dof_pos_limits[dof_idx, 0] = lower[joint_idx]
+            self.dof_pos_limits[dof_idx, 1] = upper[joint_idx]
+
+    def _init_action_scaling(self):
+        scale_vector = getattr(self.cfg.control, "action_scale_vector", None)
+        if scale_vector is None:
+            self.action_scale_vector = None
+            self.action_clip_low = None
+            self.action_clip_high = None
+            return
+        self.action_scale_vector = torch.tensor(scale_vector, device=self.device, dtype=torch.float).unsqueeze(0)
+        base_scale = float(self.cfg.control.action_scale)
+        safe_margin = 0.95
+        low = (self.dof_pos_limits[:, 0] - self.default_dof_pos[0]) / (self.action_scale_vector[0] + 1e-6)
+        high = (self.dof_pos_limits[:, 1] - self.default_dof_pos[0]) / (self.action_scale_vector[0] + 1e-6)
+        self.action_clip_low = low.unsqueeze(0) * safe_margin
+        self.action_clip_high = high.unsqueeze(0) * safe_margin
+        self.action_scale_ratio = self.action_scale_vector / max(base_scale, 1e-6)
+
+    def _sample_forward_speed(self, env_ids):
+        span = len(env_ids)
+        speed = torch_rand_float(0.6, self.command_ranges["lin_vel_x"][1], (span, 1), device=self.device).squeeze(1)
+        high_speed_mask = torch.rand(span, device=self.device) < 0.5
+        high_speed = torch_rand_float(0.95, self.command_ranges["lin_vel_x"][1], (span, 1), device=self.device).squeeze(1)
+        return torch.where(high_speed_mask, high_speed, speed)
 
 
     def _push_robots(self):
@@ -213,7 +252,7 @@ class X1DHStandEnv(LeggedRobot):
             self.commands[env_ids, 2] = torch.zeros(len(env_ids), device=self.device)
             
     def _resample_walk_sagittal_command(self, env_ids):
-        self.commands[env_ids, 0] = torch_rand_float(self.command_ranges["lin_vel_x"][0], self.command_ranges["lin_vel_x"][1], (len(env_ids), 1), device=self.device).squeeze(1)
+        self.commands[env_ids, 0] = self._sample_forward_speed(env_ids)
         self.commands[env_ids, 1] = torch.zeros(len(env_ids), device=self.device)
         if self.cfg.commands.heading_command:
             self.commands[env_ids, 3] = torch.zeros(len(env_ids), device=self.device)
@@ -237,7 +276,7 @@ class X1DHStandEnv(LeggedRobot):
             self.commands[env_ids, 2] = torch_rand_float(self.command_ranges["ang_vel_yaw"][0], self.command_ranges["ang_vel_yaw"][1], (len(env_ids), 1), device=self.device).squeeze(1)
 
     def _resample_walk_omnidirectional_command(self,env_ids):
-        self.commands[env_ids, 0] = torch_rand_float(self.command_ranges["lin_vel_x"][0], self.command_ranges["lin_vel_x"][1], (len(env_ids), 1), device=self.device).squeeze(1)
+        self.commands[env_ids, 0] = self._sample_forward_speed(env_ids)
         self.commands[env_ids, 1] = torch_rand_float(self.command_ranges["lin_vel_y"][0], self.command_ranges["lin_vel_y"][1], (len(env_ids), 1), device=self.device).squeeze(1)
         if self.cfg.commands.heading_command:
             self.commands[env_ids, 3] = torch_rand_float(self.command_ranges["heading"][0], self.command_ranges["heading"][1], (len(env_ids), 1), device=self.device).squeeze(1)
@@ -353,6 +392,9 @@ class X1DHStandEnv(LeggedRobot):
     def step(self, actions):
         if self.cfg.env.use_ref_actions:
             actions += self.ref_action
+        if self.action_scale_vector is not None:
+            actions = torch.clamp(actions, self.action_clip_low, self.action_clip_high)
+            actions = actions * self.action_scale_ratio
         return super().step(actions)
 
     def compute_observations(self):
@@ -778,6 +820,24 @@ class X1DHStandEnv(LeggedRobot):
         rew_pos = torch.sum(rew_pos * swing_mask, dim=1)
         self.feet_height *= ~contact
         return rew_pos
+
+    def _reward_toe_scuff(self):
+        contact = self.contact_forces[:, self.feet_indices, 2] > 5.
+        swing_mask = 1 - self._get_stance_mask()
+        feet_z = self.rigid_state[:, self.feet_indices, 2] - self.cfg.rewards.feet_to_ankle_distance
+        scuff = torch.clamp(self.cfg.rewards.toe_scuff_height - feet_z, min=0.0)
+        scuff *= swing_mask * (~contact)
+        return torch.sum(scuff, dim=1)
+
+    def _reward_stride_length(self):
+        foot_pos = self.rigid_state[:, self.feet_indices, :2]
+        step_length = torch.abs(foot_pos[:, 0, 0] - foot_pos[:, 1, 0])
+        stance_mask = self._get_stance_mask()
+        active = (torch.norm(self.commands[:, :3], dim=1) > self.cfg.commands.stand_com_threshold).float()
+        target = self.cfg.rewards.stride_length_target * torch.clamp(self.commands[:, 0] / self.command_ranges["lin_vel_x"][1], min=0.3, max=1.0)
+        err = torch.square(step_length - target)
+        reward = torch.exp(-8.0 * err)
+        return reward * active + (1.0 - active)
 
     def _reward_low_speed(self):
         """
