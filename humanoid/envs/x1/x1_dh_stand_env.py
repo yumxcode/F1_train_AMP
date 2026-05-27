@@ -118,6 +118,8 @@ class X1DHStandEnv(LeggedRobot):
         # [OMA] design-20260414-001 — use conservative locomotion limits instead of exporter placeholders.
         self._apply_manual_joint_limits()
         self._init_action_scaling()
+        # [OMA] v2 — 一阶低通滤波状态
+        self.filtered_actions = torch.zeros((self.num_envs, self.num_actions), device=self.device)
 
     def _apply_manual_joint_limits(self):
         if not hasattr(self.cfg.safety, "manual_joint_clip_names"):
@@ -395,6 +397,25 @@ class X1DHStandEnv(LeggedRobot):
         if self.action_scale_vector is not None:
             actions = torch.clamp(actions, self.action_clip_low, self.action_clip_high)
             actions = actions * self.action_scale_ratio
+        
+        # [OMA] v2 — 幅值衰减：模拟高速下执行器响应不足
+        if self.cfg.domain_rand.add_actuator_magnitude_saturation:
+            cmd_speed = torch.norm(self.commands[:, :2], dim=1, keepdim=True)
+            # 速度越高衰减越大：0.95→0.55
+            scale_factor = 0.95 - 0.40 * torch.clamp(cmd_speed / 1.2, 0.0, 1.0)
+            # 每步随机 ±0.05 抖动
+            noise = torch_rand_float(-0.05, 0.05, (self.num_envs, 1), device=self.device)
+            act_scale = torch.clamp(scale_factor + noise, 0.5, 1.0)
+            actions = actions * act_scale
+        
+        # [OMA] v2 — 一阶低通滤波：模拟电机动态响应
+        if self.cfg.domain_rand.add_actuator_dynamics:
+            # 时间常数 10-50ms，sim DT = 1ms
+            time_const = torch_rand_float(0.01, 0.05, (self.num_envs, 1), device=self.device)
+            alpha = 1.0 / (time_const / self.dt + 1.0)
+            self.filtered_actions = (1 - alpha) * self.filtered_actions + alpha * actions
+            actions = self.filtered_actions
+        
         return super().step(actions)
 
     def compute_observations(self):
@@ -557,6 +578,9 @@ class X1DHStandEnv(LeggedRobot):
         self.episode_length_buf[env_ids] = 0
         self.phase_length_buf[env_ids] = 0
         self.reset_buf[env_ids] = 1
+        # [OMA] v2 — 重置滤波器状态
+        if self.cfg.domain_rand.add_actuator_dynamics:
+            self.filtered_actions[env_ids] = 0.
         # rand 0 or 0.5
         self.gait_start[env_ids] = torch.randint(0, 2, (len(env_ids),)).to(self.device)*0.5
         
@@ -886,6 +910,15 @@ class X1DHStandEnv(LeggedRobot):
         """
         ankle_idx = [4,5,10,11]
         return torch.sum(torch.square(self.torques[:,ankle_idx]), dim=1)
+    
+    def _reward_ankle_motion(self):
+        """
+        [OMA] v2 — Penalizes ankle joint displacement from default position.
+        Encourages minimal ankle motion since actuator response is weak.
+        """
+        ankle_idx = [4, 5, 10, 11]
+        diff = self.dof_pos[:, ankle_idx] - self.default_dof_pos[:, ankle_idx]
+        return torch.sum(torch.abs(diff), dim=1)
     
     def _reward_feet_rotation(self):
         feet_euler_xyz = self.feet_euler_xyz

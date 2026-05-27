@@ -205,12 +205,14 @@ class X1DHStandCfg(LeggedRobotCfg):
                                   [-0.015, 0.015],
                                   [-0.05, 0.05]]
 
+        # [OMA] v2 — 扩大 PD 增益随机化范围，模拟电机响应不一致
         randomize_gains = True
-        stiffness_multiplier_range = [0.85, 1.15]  # Factor
-        damping_multiplier_range = [0.85, 1.15]    # Factor
+        stiffness_multiplier_range = [0.6, 1.3]    # [0.85, 1.15] → 扩大
+        damping_multiplier_range = [0.6, 1.3]      # [0.85, 1.15] → 扩大
 
+        # [OMA] v2 — 大幅扩大扭矩随机化，模拟高速下响应不足
         randomize_torque = True
-        torque_multiplier_range = [0.9, 1.1]
+        torque_multiplier_range = [0.5, 1.2]       # [0.9, 1.1] → 大幅扩大
 
         randomize_link_mass = True
         added_link_mass_range = [0.9, 1.1]
@@ -220,15 +222,15 @@ class X1DHStandCfg(LeggedRobotCfg):
         
         randomize_joint_friction = True
         randomize_joint_friction_each_joint = False
-        joint_friction_range = [0.01, 1.15]
-        joint_1_friction_range = [0.01, 1.15]
-        joint_2_friction_range = [0.01, 1.15]
-        joint_3_friction_range = [0.01, 1.15]
+        joint_friction_range = [0.01, 1.5]         # [0.01, 1.15] → 略扩大
+        joint_1_friction_range = [0.01, 1.5]
+        joint_2_friction_range = [0.01, 1.5]
+        joint_3_friction_range = [0.01, 1.5]
         joint_4_friction_range = [0.5, 1.3]
         joint_5_friction_range = [0.5, 1.3]
-        joint_6_friction_range = [0.01, 1.15]
-        joint_7_friction_range = [0.01, 1.15]
-        joint_8_friction_range = [0.01, 1.15]
+        joint_6_friction_range = [0.01, 1.5]
+        joint_7_friction_range = [0.01, 1.5]
+        joint_8_friction_range = [0.01, 1.5]
         joint_9_friction_range = [0.5, 1.3]
         joint_10_friction_range = [0.5, 1.3]
 
@@ -260,31 +262,42 @@ class X1DHStandCfg(LeggedRobotCfg):
         joint_9_armature_range = [0.0001, 0.05]
         joint_10_armature_range = [0.0001, 0.05]
 
+        # [OMA] v2 — 扩大延迟覆盖，目标覆盖 50ms
+        # sim DT = 1ms，timesteps 直接对应 ms
         add_lag = True
         randomize_lag_timesteps = True
         randomize_lag_timesteps_perstep = False
         lag_timesteps_range = [0, 12]
         
+        # [OMA] v2 — 位置+速度联合延迟，扩展到 50ms，每步随机变化
         add_dof_lag = True
         randomize_dof_lag_timesteps = True
-        randomize_dof_lag_timesteps_perstep = False
-        dof_lag_timesteps_range = [0, 12]
+        randomize_dof_lag_timesteps_perstep = True  # False → True 每步随机
+        dof_lag_timesteps_range = [5, 50]            # [0, 12] → [5, 50]
         
-        add_dof_pos_vel_lag = False
-        randomize_dof_pos_lag_timesteps = False
-        randomize_dof_pos_lag_timesteps_perstep = False
-        dof_pos_lag_timesteps_range = [7, 25]
-        randomize_dof_vel_lag_timesteps = False
-        randomize_dof_vel_lag_timesteps_perstep = False
-        dof_vel_lag_timesteps_range = [7, 25]
+        # [OMA] v2 — 启用位置/速度解耦延迟
+        add_dof_pos_vel_lag = True                   # False → True
+        randomize_dof_pos_lag_timesteps = True
+        randomize_dof_pos_lag_timesteps_perstep = True
+        dof_pos_lag_timesteps_range = [5, 50]        # [7, 25] → [5, 50]
+        randomize_dof_vel_lag_timesteps = True
+        randomize_dof_vel_lag_timesteps_perstep = True
+        dof_vel_lag_timesteps_range = [5, 50]        # [7, 25] → [5, 50]
         
-        add_imu_lag = False
+        # [OMA] v2 — 启用 IMU 延迟
+        add_imu_lag = True                           # False → True
         randomize_imu_lag_timesteps = True
-        randomize_imu_lag_timesteps_perstep = False
-        imu_lag_timesteps_range = [0, 8]
+        randomize_imu_lag_timesteps_perstep = True   # 每步随机
+        imu_lag_timesteps_range = [3, 20]            # [0, 8] → [3, 20]
+
+        # [OMA] v2 — 新增：幅值衰减标志（在 env step 中使用）
+        add_actuator_magnitude_saturation = True     # 新增
+        # [OMA] v2 — 新增：一阶低通滤波标志（在 env step 中使用）
+        add_actuator_dynamics = True                 # 新增
         
+        # [OMA] v2 — 扩大库仑摩擦范围
         randomize_coulomb_friction = True
-        joint_coulomb_range = [0.1, 0.9]
+        joint_coulomb_range = [0.05, 1.5]            # [0.1, 0.9] → 扩大
         joint_viscous_range = [0.05, 0.1]
         
     class commands(LeggedRobotCfg.commands):
@@ -320,13 +333,15 @@ class X1DHStandCfg(LeggedRobotCfg):
         foot_max_dist = 1.0
 
         # final_swing_joint_pos = final_swing_joint_delta_pos + default_pos
-        final_swing_joint_delta_pos = [0.25, 0.05, -0.11, 0.35, -0.16, 0.0, -0.25, -0.05, 0.11, 0.35, -0.16, 0.0]
-        target_feet_height = 0.04
-        target_feet_height_max = 0.07
+        # [OMA] v2 — 脚踝(索引4,5,10,11) delta 置零，减少脚踝主动运动
+        final_swing_joint_delta_pos = [0.25, 0.05, -0.11, 0.35, 0.0, 0.0, -0.25, -0.05, 0.11, 0.35, 0.0, 0.0]
+        # [OMA] v2 — 抬腿高度提高，补偿执行器幅值不足
+        target_feet_height = 0.06       # 0.04 → 0.06
+        target_feet_height_max = 0.10   # 0.07 → 0.10 放宽上限
         feet_to_ankle_distance = 0.041
-        cycle_time = 0.64
+        cycle_time = 1.0                # 0.64 → 1.0 步态周期
         stride_length_target = 0.36
-        toe_scuff_height = 0.035
+        toe_scuff_height = 0.04         # 0.035 → 0.04 防拖脚
         # if true negative total rewards are clipped at zero (avoids early termination problems)
         only_positive_rewards = True
         # tracking reward = exp(-error*sigma)
@@ -334,37 +349,40 @@ class X1DHStandCfg(LeggedRobotCfg):
         max_contact_force = 700  # forces above this value are penalized
         
         class scales:
-            ref_joint_pos = 2.2
-            feet_clearance = 0.35
+            ref_joint_pos = 1.2             # 2.2 → 1.2 降低轨迹约束
+            feet_clearance = 0.50           # 0.35 → 0.50 提高确保抬腿够高
             feet_contact_number = 0.8
             # gait
-            feet_air_time = 1.2
-            foot_slip = -0.25
+            feet_air_time = 1.0             # 1.2 → 1.0 略降（周期变长，air time自然增加）
+            foot_slip = -0.40               # -0.25 → -0.40 严惩打滑
             feet_distance = 0.2
             knee_distance = 0.2
             # contact 
-            feet_contact_forces = -0.01
+            feet_contact_forces = -0.03     # -0.01 → -0.03 减少冲击
             # vel tracking
-            tracking_lin_vel = 2.5
-            tracking_ang_vel = 0.6
-            vel_mismatch_exp = 0.5  # lin_z; ang x,y
+            tracking_lin_vel = 3.0          # 2.5 → 3.0 主要任务
+            tracking_ang_vel = 1.0          # 0.6 → 1.0 方向稳定性
+            vel_mismatch_exp = 0.5          # lin_z; ang x,y
             low_speed = 1.0
-            track_vel_hard = 0.8
-            toe_scuff = -0.8
+            track_vel_hard = 0.5            # 0.8 → 0.5 降冗余硬惩罚
+            toe_scuff = -1.0                # -0.8 → -1.0 提高防拖脚
             stride_length = 0.25
             # base pos
-            default_joint_pos = 1.0
+            default_joint_pos = 0.8         # 1.0 → 0.8 略降
             orientation = 1.
             feet_rotation = 0.3
             base_height = 0.2
             base_acc = 0.2
             # energy
-            action_smoothness = -0.01
-            torques = -8e-9
-            dof_vel = -2e-8
-            dof_acc = -1e-7
-            collision = -1.
+            action_smoothness = -0.15       # -0.01 → -0.15 大幅提高，抑制抖动
+            torques = -5e-8                 # -8e-9 → -5e-8 提高能耗惩罚
+            dof_vel = -5e-8                 # -2e-8 → -5e-8
+            dof_acc = -1e-6                 # -1e-7 → -1e-6 惩罚加加速度
+            collision = -5.0                # -1.0 → -5.0 严厉惩罚碰撞
             stand_still = 2.5
+            # [OMA] v2 — 新增脚踝惩罚项
+            ankle_torques = -0.03           # 新增：惩罚脚踝力矩
+            ankle_motion = -0.10            # 新增：惩罚脚踝主动运动
             # limits
             dof_vel_limits = -1
             dof_pos_limits = -10.
@@ -400,11 +418,11 @@ class X1DHStandCfgPPO(LeggedRobotCfgPPO):
         in_channels = X1DHStandCfg.env.frame_stack
 
     class algorithm(LeggedRobotCfgPPO.algorithm):
-        entropy_coef = 0.001
-        learning_rate = 1e-5
-        num_learning_epochs = 2
-        gamma = 0.994
-        lam = 0.9
+        entropy_coef = 0.002        # 0.001 → 0.002 鼓励探索
+        learning_rate = 3e-5        # 1e-5 → 3e-5 加快收敛
+        num_learning_epochs = 5     # 2 → 5 提高数据效率
+        gamma = 0.99                # 0.994 → 0.99
+        lam = 0.95                  # 0.9 → 0.95
         num_mini_batches = 4
         if X1DHStandCfg.terrain.measure_heights:
             lin_vel_idx = (X1DHStandCfg.env.single_num_privileged_obs + X1DHStandCfg.terrain.num_height) * (X1DHStandCfg.env.c_frame_stack - 1) + X1DHStandCfg.env.single_linvel_index
@@ -415,7 +433,7 @@ class X1DHStandCfgPPO(LeggedRobotCfgPPO):
         policy_class_name = 'ActorCriticDH'
         algorithm_class_name = 'DHPPO'
         num_steps_per_env = 24  # per iteration
-        max_iterations = 20000  # number of policy updates
+        max_iterations = 30000  # 20000 → 30000 更多迭代
 
         # logging
         save_interval = 100  # check for potential saves every this many iterations
