@@ -334,7 +334,8 @@ class X1DHStandCfg(LeggedRobotCfg):
 
         # final_swing_joint_pos = final_swing_joint_delta_pos + default_pos
         # [OMA] v2 — 脚踝(索引4,5,10,11) delta 置零，减少脚踝主动运动
-        final_swing_joint_delta_pos = [0.25, 0.05, -0.11, 0.35, 0.0, 0.0, -0.25, -0.05, 0.11, 0.35, 0.0, 0.0]
+        # [OMA] v3+ — 脚踝略微上翘(+0.15rad)，让摆动期脚尖抬起来更容易达到 clearance
+        final_swing_joint_delta_pos = [0.25, 0.05, -0.11, 0.35, 0.15, 0.0, -0.25, -0.05, 0.11, 0.35, 0.15, 0.0]
         # [OMA] v2 — 抬腿高度提高，补偿执行器幅值不足
         target_feet_height = 0.06       # 0.04 → 0.06
         target_feet_height_max = 0.10   # 0.07 → 0.10 放宽上限
@@ -354,7 +355,7 @@ class X1DHStandCfg(LeggedRobotCfg):
             feet_clearance = 0.50           # 维持
             feet_contact_number = 0.8
             # gait
-            feet_air_time = 1.0
+            feet_air_time = 5.0             # 1.0 → 5.0 🔑 大幅提高腾空奖励权重
             foot_slip = -0.20               # -0.40 → -0.20 降低，给策略探索空间
             feet_distance = 0.2
             knee_distance = 0.2
@@ -419,7 +420,7 @@ class X1DHStandCfgPPO(LeggedRobotCfgPPO):
         in_channels = X1DHStandCfg.env.frame_stack
 
     class algorithm(LeggedRobotCfgPPO.algorithm):
-        entropy_coef = 0.005        # 0.002 → 0.005 大幅提高探索
+        entropy_coef = 0.003        # 0.005 → 0.003 降一点，避免过度探索
         learning_rate = 1e-4        # 3e-5 → 1e-4 加快收敛
         num_learning_epochs = 5     # 维持
         gamma = 0.99                # 0.994 → 0.99

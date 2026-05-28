@@ -824,26 +824,17 @@ class X1DHStandEnv(LeggedRobot):
     
     def _reward_feet_clearance(self):
         """
-        Calculates reward based on the clearance of the swing leg from the ground during movement.
-        Encourages appropriate lift of the feet during the swing phase of the gait.
+        [OMA] v3+ — 连续化腾空奖励，消除二元奖励的梯度消失问题。
+        原 reward = binary(>6cm)，策略抬1cm或5cm都是0。
+        新 reward = 1-exp(-30*h)，0→6cm 都有连续梯度。
         """
-        # Compute feet contact mask
         contact = self.contact_forces[:, self.feet_indices, 2] > 5.
-
-        # Get the z-position of the feet and compute the change in z-position
         feet_z = self.rigid_state[:, self.feet_indices, 2] - self.cfg.rewards.feet_to_ankle_distance
-        delta_z = feet_z - self.last_feet_z
-        self.feet_height += delta_z
-        self.last_feet_z = feet_z
-
-        # Compute swing mask
         swing_mask = 1 - self._get_stance_mask()
-
-        # feet height should larger than target feet height at the peak
-        rew_pos = (self.feet_height > self.cfg.rewards.target_feet_height) * (self.feet_height < self.cfg.rewards.target_feet_height_max)
-        rew_pos = torch.sum(rew_pos * swing_mask, dim=1)
-        self.feet_height *= ~contact
-        return rew_pos
+        # 连续高度奖励：0.00m→0.00, 0.02m→0.45, 0.04m→0.70, 0.06m→0.83, 0.10m→0.95
+        height_factor = 1.0 - torch.exp(-feet_z * 30)
+        rew = torch.sum(height_factor * swing_mask, dim=1)
+        return rew
 
     def _reward_toe_scuff(self):
         contact = self.contact_forces[:, self.feet_indices, 2] > 5.
