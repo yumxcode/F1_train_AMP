@@ -865,35 +865,22 @@ class X1DHStandEnv(LeggedRobot):
 
     def _reward_low_speed(self):
         """
-        Rewards or penalizes the robot based on its speed relative to the commanded speed. 
-        This function checks if the robot is moving too slow, too fast, or at the desired speed, 
-        and if the movement direction matches the command.
+        [OMA] v3 — 降低惩罚力度和阈值。原来 0.5*cmd 就判 too_low 打 -1.0，
+        在 DR 衰减下策略永远达不到，反而奖励站着不动。
+        改为 0.2*cmd 判 too_low，惩罚降低到 -0.3。
         """
-        # Calculate the absolute value of speed and command for comparison
         absolute_speed = torch.abs(self.base_lin_vel[:, 0])
         absolute_command = torch.abs(self.commands[:, 0])
 
-        # Define speed criteria for desired range
-        speed_too_low = absolute_speed < 0.5 * absolute_command
-        speed_too_high = absolute_speed > 1.2 * absolute_command
-        speed_desired = ~(speed_too_low | speed_too_high)
+        speed_too_low = absolute_speed < 0.2 * absolute_command   # 0.5 → 0.2
+        speed_desired = absolute_speed >= 0.2 * absolute_command  # 放宽预期范围
 
-        # Check if the speed and command directions are mismatched
-        sign_mismatch = torch.sign(
-            self.base_lin_vel[:, 0]) != torch.sign(self.commands[:, 0])
+        sign_mismatch = torch.sign(self.base_lin_vel[:, 0]) != torch.sign(self.commands[:, 0])
 
-        # Initialize reward tensor
         reward = torch.zeros_like(self.base_lin_vel[:, 0])
-
-        # Assign rewards based on conditions
-        # Speed too low
-        reward[speed_too_low] = -1.0
-        # Speed too high
-        reward[speed_too_high] = 0.
-        # Speed within desired range
-        reward[speed_desired] = 1.2
-        # Sign mismatch has the highest priority
-        reward[sign_mismatch] = -2.0
+        reward[speed_too_low] = -0.3          # -1.0 → -0.3
+        reward[speed_desired] = 0.6           # 1.2 → 0.6
+        reward[sign_mismatch] = -1.0          # -2.0 → -1.0
         return reward * (self.commands[:, 0].abs() > 0.05)
     
     def _reward_torques(self):

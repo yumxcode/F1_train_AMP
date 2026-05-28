@@ -262,38 +262,38 @@ class X1DHStandCfg(LeggedRobotCfg):
         joint_9_armature_range = [0.0001, 0.05]
         joint_10_armature_range = [0.0001, 0.05]
 
-        # [OMA] v2 — 扩大延迟覆盖，目标覆盖 50ms
-        # sim DT = 1ms，timesteps 直接对应 ms
+        # [OMA] v3 — 延迟随机化：缩小范围，先让策略学会基本行走
+        # 实机延迟 20-50ms，但一次性覆盖太强导致策略无法起步
         add_lag = True
         randomize_lag_timesteps = True
         randomize_lag_timesteps_perstep = False
-        lag_timesteps_range = [0, 12]
+        lag_timesteps_range = [0, 8]
         
-        # [OMA] v2 — 位置+速度联合延迟，扩展到 50ms，每步随机变化
+        # [OMA] v3 — dof 延迟缩小到 2-20ms，逐步适应
         add_dof_lag = True
         randomize_dof_lag_timesteps = True
-        randomize_dof_lag_timesteps_perstep = True  # False → True 每步随机
-        dof_lag_timesteps_range = [5, 50]            # [0, 12] → [5, 50]
+        randomize_dof_lag_timesteps_perstep = True
+        dof_lag_timesteps_range = [2, 20]            # [5, 50] → [2, 20] 缩小
         
-        # [OMA] v2 — 启用位置/速度解耦延迟
-        add_dof_pos_vel_lag = True                   # False → True
-        randomize_dof_pos_lag_timesteps = True
-        randomize_dof_pos_lag_timesteps_perstep = True
-        dof_pos_lag_timesteps_range = [5, 50]        # [7, 25] → [5, 50]
-        randomize_dof_vel_lag_timesteps = True
-        randomize_dof_vel_lag_timesteps_perstep = True
-        dof_vel_lag_timesteps_range = [5, 50]        # [7, 25] → [5, 50]
+        # [OMA] v3 — 关闭 pos/vel 解耦延迟（减少观测混乱）
+        add_dof_pos_vel_lag = False                   # True → False 关闭
+        randomize_dof_pos_lag_timesteps = False
+        randomize_dof_pos_lag_timesteps_perstep = False
+        dof_pos_lag_timesteps_range = [2, 15]
+        randomize_dof_vel_lag_timesteps = False
+        randomize_dof_vel_lag_timesteps_perstep = False
+        dof_vel_lag_timesteps_range = [2, 15]
         
-        # [OMA] v2 — 启用 IMU 延迟
-        add_imu_lag = True                           # False → True
+        # [OMA] v3 — IMU 延迟缩小范围
+        add_imu_lag = True
         randomize_imu_lag_timesteps = True
-        randomize_imu_lag_timesteps_perstep = True   # 每步随机
-        imu_lag_timesteps_range = [3, 20]            # [0, 8] → [3, 20]
+        randomize_imu_lag_timesteps_perstep = True
+        imu_lag_timesteps_range = [2, 12]            # [3, 20] → [2, 12]
 
-        # [OMA] v2 — 新增：幅值衰减标志（在 env step 中使用）
-        add_actuator_magnitude_saturation = True     # 新增
-        # [OMA] v2 — 新增：一阶低通滤波标志（在 env step 中使用）
-        add_actuator_dynamics = True                 # 新增
+        # [OMA] v3 — 关掉幅值衰减（等策略学会走再开）
+        add_actuator_magnitude_saturation = False     # True → False 关闭
+        # [OMA] v3 — 关掉一阶低通滤波（同上）
+        add_actuator_dynamics = False                 # True → False 关闭
         
         # [OMA] v2 — 扩大库仑摩擦范围
         randomize_coulomb_friction = True
@@ -345,44 +345,45 @@ class X1DHStandCfg(LeggedRobotCfg):
         # if true negative total rewards are clipped at zero (avoids early termination problems)
         only_positive_rewards = True
         # tracking reward = exp(-error*sigma)
-        tracking_sigma = 5 
+        tracking_sigma = 3                  # 5 → 3 更宽泛的跟踪奖励
         max_contact_force = 700  # forces above this value are penalized
         
         class scales:
-            ref_joint_pos = 1.2             # 2.2 → 1.2 降低轨迹约束
-            feet_clearance = 0.50           # 0.35 → 0.50 提高确保抬腿够高
+            # [OMA] v3 — 大幅降低 ref_joint_pos/stand_still，减少"站着不动"的收益
+            ref_joint_pos = 0.6             # 1.2 → 0.6
+            feet_clearance = 0.50           # 维持
             feet_contact_number = 0.8
             # gait
-            feet_air_time = 1.0             # 1.2 → 1.0 略降（周期变长，air time自然增加）
-            foot_slip = -0.40               # -0.25 → -0.40 严惩打滑
+            feet_air_time = 1.0
+            foot_slip = -0.20               # -0.40 → -0.20 降低，给策略探索空间
             feet_distance = 0.2
             knee_distance = 0.2
             # contact 
-            feet_contact_forces = -0.03     # -0.01 → -0.03 减少冲击
-            # vel tracking
-            tracking_lin_vel = 3.0          # 2.5 → 3.0 主要任务
-            tracking_ang_vel = 1.0          # 0.6 → 1.0 方向稳定性
-            vel_mismatch_exp = 0.5          # lin_z; ang x,y
-            low_speed = 1.0
-            track_vel_hard = 0.5            # 0.8 → 0.5 降冗余硬惩罚
-            toe_scuff = -1.0                # -0.8 → -1.0 提高防拖脚
+            feet_contact_forces = -0.02     # -0.03 → -0.02
+            # vel tracking — 提高，让走路明确比站着划算
+            tracking_lin_vel = 4.0          # 3.0 → 4.0
+            tracking_ang_vel = 1.0
+            vel_mismatch_exp = 0.5
+            low_speed = 0.3                 # 1.0 → 0.3 🔑 大幅降低惩罚，避免"走路被罚"
+            track_vel_hard = 0.3            # 0.5 → 0.3
+            toe_scuff = -0.5                # -1.0 → -0.5 降低
             stride_length = 0.25
             # base pos
-            default_joint_pos = 0.8         # 1.0 → 0.8 略降
-            orientation = 1.
+            default_joint_pos = 0.5         # 0.8 → 0.5 再降
+            orientation = 1.0
             feet_rotation = 0.3
             base_height = 0.2
             base_acc = 0.2
-            # energy
-            action_smoothness = -0.15       # -0.01 → -0.15 大幅提高，抑制抖动
-            torques = -5e-8                 # -8e-9 → -5e-8 提高能耗惩罚
-            dof_vel = -5e-8                 # -2e-8 → -5e-8
-            dof_acc = -1e-6                 # -1e-7 → -1e-6 惩罚加加速度
-            collision = -5.0                # -1.0 → -5.0 严厉惩罚碰撞
-            stand_still = 2.5
-            # [OMA] v2 — 新增脚踝惩罚项
-            ankle_torques = -0.03           # 新增：惩罚脚踝力矩
-            ankle_motion = -0.10            # 新增：惩罚脚踝主动运动
+            # energy — 降低惩罚，让策略有尝试空间
+            action_smoothness = -0.05       # -0.15 → -0.05 大幅降低
+            torques = -1e-8                 # -5e-8 → -1e-8
+            dof_vel = -1e-8                 # -5e-8 → -1e-8
+            dof_acc = -2e-7                 # -1e-6 → -2e-7
+            collision = -2.0                # -5.0 → -2.0 🔑 大幅降低碰撞惩罚
+            stand_still = 1.0               # 2.5 → 1.0 🔑 降低站立收益
+            # [OMA] v3 — 脚踝惩罚降低（先让策略学会走，再优化细节）
+            ankle_torques = -0.01           # -0.03 → -0.01
+            ankle_motion = -0.03            # -0.10 → -0.03
             # limits
             dof_vel_limits = -1
             dof_pos_limits = -10.
@@ -418,9 +419,9 @@ class X1DHStandCfgPPO(LeggedRobotCfgPPO):
         in_channels = X1DHStandCfg.env.frame_stack
 
     class algorithm(LeggedRobotCfgPPO.algorithm):
-        entropy_coef = 0.002        # 0.001 → 0.002 鼓励探索
-        learning_rate = 3e-5        # 1e-5 → 3e-5 加快收敛
-        num_learning_epochs = 5     # 2 → 5 提高数据效率
+        entropy_coef = 0.005        # 0.002 → 0.005 大幅提高探索
+        learning_rate = 1e-4        # 3e-5 → 1e-4 加快收敛
+        num_learning_epochs = 5     # 维持
         gamma = 0.99                # 0.994 → 0.99
         lam = 0.95                  # 0.9 → 0.95
         num_mini_batches = 4

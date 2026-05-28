@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AgiBot X1 控制概念说明</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+<style>
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    max-width: 860px;
+    margin: 40px auto;
+    padding: 0 24px;
+    line-height: 1.8;
+    color: #222;
+    background: #fafafa;
+  }
+  h1 { font-size: 1.6em; border-bottom: 2px solid #3b82f6; padding-bottom: 8px; color: #1e3a5f; }
+  h2 { font-size: 1.2em; margin-top: 2em; color: #1d4ed8; border-left: 4px solid #3b82f6; padding-left: 10px; }
+  h3 { font-size: 1.05em; color: #374151; margin-top: 1.4em; }
+  .formula-box {
+    background: #f0f4ff;
+    border: 1px solid #c7d7f9;
+    border-radius: 8px;
+    padding: 16px 24px;
+    margin: 14px 0;
+    font-size: 1.1em;
+    text-align: center;
+  }
+  code {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: "Fira Code", "Courier New", monospace;
+    font-size: 0.9em;
+    color: #0f172a;
+  }
+  pre {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    font-size: 0.88em;
+    line-height: 1.7;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 14px 0;
+  }
+  th { background: #dbeafe; color: #1e3a5f; }
+  th, td {
+    border: 1px solid #bfdbfe;
+    padding: 9px 14px;
+    text-align: left;
+  }
+  tr:nth-child(even) td { background: #f8faff; }
+  .tag {
+    display: inline-block;
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 4px;
+    padding: 1px 8px;
+    font-size: 0.82em;
+    font-weight: bold;
+    margin-right: 6px;
+  }
+  .note {
+    background: #fef9c3;
+    border-left: 4px solid #eab308;
+    padding: 10px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 14px 0;
+    font-size: 0.95em;
+  }
+  .flow {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 14px 0;
+    font-family: monospace;
+    font-size: 0.93em;
+    line-height: 2;
+  }
+  .flow .arrow { color: #16a34a; font-weight: bold; }
+  .flow .label { color: #6b7280; font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<h1>AgiBot X1 项目控制理论概念说明</h1>
+
+<!-- ===== 1. Kp Kd ===== -->
+<h2>1. Kp / Kd 设计（刚度与阻尼增益）</h2>
+
+<p>代码中 <code>stiffness</code> 即 <strong>Kp</strong>，<code>damping</code> 即 <strong>Kd</strong>，对应各关节的 PD 控制增益：</p>
+
+<pre>stiffness = {'hip_pitch_joint': 30,  'hip_roll_joint': 40,  'knee_pitch_joint': 100, ...}
+damping   = {'hip_pitch_joint':  3,  'hip_roll_joint':  3,  'knee_pitch_joint':  10, ...}</pre>
+
+<p>实际执行的力矩公式（<code>legged_robot.py</code> 第 730 行）：</p>
+
+<div class="formula-box">
+  \[ \tau = K_p \cdot (\theta_{\text{des}} - \theta) - K_d \cdot \dot{\theta} \]
+</div>
+
+<p>其中：</p>
+<ul>
+  <li>\(\theta_{\text{des}}\) — 策略输出的目标角度（<code>default_dof_pos + 0.5 × action</code>）</li>
+  <li>\(\theta\) — 当前关节角</li>
+  <li>\(\dot{\theta}\) — 当前关节角速度</li>
+</ul>
+
+<table>
+  <tr><th>参数</th><th>增大效果</th><th>减小效果</th></tr>
+  <tr><td>Kp（刚度）</td><td>跟踪更积极，但易振荡</td><td>响应软，跟踪误差大</td></tr>
+  <tr><td>Kd（阻尼）</td><td>振荡衰减快，响应平滑</td><td>阻尼不足，易超调</td></tr>
+</table>
+
+<div class="note">膝关节 Kp = 100 是所有关节中最大的，因为其需要最强的支撑刚度来承受体重。</div>
+
+
+<!-- ===== 2. ZOH ===== -->
+<h2>2. ZOH（零阶保持器，Zero-Order Hold）</h2>
+
+<p>由 <code>decimation = 10</code> 产生：</p>
+
+<pre>sim_dt     = 0.001 s  →  仿真频率  = 1000 Hz
+policy_dt  = 0.001 × 10 = 0.01 s  →  策略频率 = 100 Hz</pre>
+
+<p>策略每 10ms 输出一个动作，该动作被<strong>保持不变地执行 10 个仿真步</strong>——这正是 ZOH 的本质。在频域上，ZOH 等效于引入额外相位滞后：</p>
+
+<div class="formula-box">
+  \[ \angle H_{\text{ZOH}}(\omega) = -\frac{\omega T}{2} \]
+</div>
+
+<p>其中 \(T = 0.01\,\text{s}\)（保持时间）。例如在自然频率 \(\omega_n = 31.6\) rad/s 处，ZOH 引入约：</p>
+
+<div class="formula-box">
+  \[ \Delta\phi = -\frac{31.6 \times 0.01}{2} \approx -0.158\,\text{rad} \approx -9°\]
+</div>
+
+<div class="note">这个相位滞后会削减系统的相位裕度，是离散控制稳定性分析的核心因素。</div>
+
+
+<!-- ===== 3. 自然频率 ===== -->
+<h2>3. 自然频率（Natural Frequency）</h2>
+
+<p>对 PD 控制的单关节系统，忽略阻尼时，闭环自然频率近似为：</p>
+
+<div class="formula-box">
+  \[ \omega_n = \sqrt{\frac{K_p}{J_{\text{eff}}}} \]
+</div>
+
+<p>考虑 Kd 的阻尼效果，系统阻尼比为：</p>
+
+<div class="formula-box">
+  \[ \zeta = \frac{K_d}{2\sqrt{K_p \cdot J_{\text{eff}}}} \]
+</div>
+
+<p>以膝关节为例（\(K_p=100,\; K_d=10\)），若等效惯量 \(J_{\text{eff}} \approx 0.1\) kg·m²：</p>
+
+<div class="formula-box">
+  \[ \omega_n = \sqrt{\frac{100}{0.1}} = \sqrt{1000} \approx 31.6\,\text{rad/s} \approx 5\,\text{Hz} \]
+  \[ \zeta = \frac{10}{2\sqrt{100 \times 0.1}} = \frac{10}{2 \times \sqrt{10}} \approx 1.58 \quad \text{（过阻尼）} \]
+</div>
+
+<div class="note">
+  <strong>关键约束：</strong>自然频率必须显著低于策略频率（100 Hz），否则 ZOH 引入的相位滞后会使系统失稳。
+  本项目 \(\omega_n \approx 5\,\text{Hz} \ll 100\,\text{Hz}\)，满足约束。
+</div>
+
+
+<!-- ===== 4. 相位裕度 ===== -->
+<h2>4. 相位裕度（Phase Margin）</h2>
+
+<p>相位裕度衡量系统距离不稳定边界（−180° 相位点）还有多少余量，工程上要求 ≥ 30°～45°。</p>
+
+<p>开环传递函数在增益穿越频率 \(\omega_c\) 处的相位裕度：</p>
+
+<div class="formula-box">
+  \[ \text{PM} = 180° + \angle G_{\text{open}}(j\omega_c) \]
+</div>
+
+<p>本项目中各因素对相位裕度的影响：</p>
+
+<table>
+  <tr><th>因素</th><th>数值</th><th>影响</th></tr>
+  <tr><td>ZOH（T = 10ms）</td><td>\(-\omega T/2\)</td><td>引入额外相位滞后</td></tr>
+  <tr><td>观测延迟（lag randomization）</td><td>随机 1~3 步</td><td>进一步降低相位裕度</td></tr>
+  <tr><td>Kd 微分项</td><td>正相位补偿</td><td>超前补偿，提升裕度</td></tr>
+  <tr><td>关节 damping 随机化</td><td>[0.3, 1.5] 倍</td><td>相位裕度在部署时随机变化</td></tr>
+  <tr><td>Kp / Kd Domain Rand</td><td>[0.8, 1.2] 倍</td><td>训练时覆盖多种裕度场景</td></tr>
+</table>
+
+
+<!-- ===== 5. 串联关系 ===== -->
+<h2>5. 训练中的串联控制链路</h2>
+
+<div class="flow">
+  <span style="color:#1d4ed8; font-weight:bold;">策略网络输出 action</span><br>
+  <span class="arrow">  ↓</span> <span class="label">action_scale = 0.5</span><br>
+  <span style="color:#1d4ed8; font-weight:bold;">\(\theta_{\text{des}} = \theta_{\text{default}} + 0.5 \times \text{action}\)</span><br>
+  <span class="arrow">  ↓</span> <span class="label">ZOH：保持 10 个 sim step（100 Hz 策略 → 1000 Hz 仿真）</span><br>
+  <span style="color:#1d4ed8; font-weight:bold;">\(\tau = K_p(\theta_{\text{des}} - \theta) - K_d\dot{\theta}\)</span><br>
+  <span class="arrow">  ↓</span> <span class="label">Domain Rand：Kp × [0.8, 1.2]，Kd × [0.8, 1.2]</span><br>
+  <span style="color:#1d4ed8; font-weight:bold;">实际力矩 → 仿真物理引擎（PhysX, 1000 Hz）</span>
+</div>
+
+<div class="note">
+  Domain Randomization 对 Kp/Kd 的 ±20% 扰动，目的正是让策略在自然频率和相位裕度都存在不确定性的情况下仍保持稳定，提升 <strong>sim-to-real</strong> 转移的鲁棒性。
+</div>
+
+<hr style="margin-top:3em; border-color:#e2e8f0;">
+<p style="color:#94a3b8; font-size:0.85em; text-align:center;">AgiBot X1 训练项目 · 控制理论说明文档</p>
+
+</body>
+</html>

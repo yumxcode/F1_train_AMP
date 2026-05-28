@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>X1 真机部署：基于 PACE 的参数辨识方案</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+<style>
+  body { font-family: "PingFang SC","Microsoft YaHei",sans-serif; max-width:960px; margin:40px auto; padding:0 28px; line-height:1.85; color:#1e293b; background:#f8fafc; }
+  h1 { font-size:1.6em; border-bottom:3px solid #2563eb; padding-bottom:10px; color:#1e3a5f; }
+  h2 { font-size:1.18em; margin-top:2.2em; color:#1d4ed8; border-left:5px solid #3b82f6; padding:5px 0 5px 12px; background:#eff6ff; border-radius:0 6px 6px 0; }
+  h3 { font-size:1.02em; color:#334155; margin-top:1.4em; }
+  code { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:1px 6px; font-family:"Fira Code",monospace; font-size:0.87em; color:#0f172a; }
+  pre { background:#1e293b; color:#e2e8f0; border-radius:8px; padding:16px 20px; overflow-x:auto; font-size:0.85em; line-height:1.75; }
+  .formula-box { background:#f0f4ff; border:1px solid #c7d7f9; border-radius:8px; padding:14px 24px; margin:12px 0; text-align:center; font-size:1.05em; }
+  table { border-collapse:collapse; width:100%; margin:14px 0; }
+  th { background:#dbeafe; color:#1e3a5f; font-weight:600; }
+  th,td { border:1px solid #bfdbfe; padding:8px 13px; text-align:left; font-size:0.92em; }
+  tr:nth-child(even) td { background:#f8faff; }
+  .warn  { background:#fef9c3; border-left:4px solid #eab308; padding:10px 16px; border-radius:0 6px 6px 0; margin:12px 0; font-size:0.93em; }
+  .ok    { background:#f0fdf4; border-left:4px solid #22c55e; padding:10px 16px; border-radius:0 6px 6px 0; margin:12px 0; font-size:0.93em; }
+  .info  { background:#eff6ff; border-left:4px solid #3b82f6; padding:10px 16px; border-radius:0 6px 6px 0; margin:12px 0; font-size:0.93em; }
+  .danger{ background:#fff1f2; border-left:4px solid #ef4444; padding:10px 16px; border-radius:0 6px 6px 0; margin:12px 0; font-size:0.93em; }
+  .phase { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:18px 22px; margin:18px 0; }
+  .phase-title { font-weight:bold; font-size:1.05em; color:#1e40af; margin-bottom:10px; border-bottom:1px dashed #bfdbfe; padding-bottom:6px; }
+  .flow-box { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:16px 20px; margin:14px 0; font-family:monospace; font-size:0.9em; line-height:2.2; }
+  .tag-red   { background:#fee2e2; color:#991b1b; border-radius:4px; padding:1px 7px; font-size:0.82em; font-weight:bold; }
+  .tag-green { background:#dcfce7; color:#166534; border-radius:4px; padding:1px 7px; font-size:0.82em; font-weight:bold; }
+  .tag-blue  { background:#dbeafe; color:#1e40af; border-radius:4px; padding:1px 7px; font-size:0.82em; font-weight:bold; }
+  .compare-box { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:14px 0; }
+  .compare-col { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; }
+  .compare-col h4 { margin:0 0 8px 0; font-size:0.95em; }
+  ul { padding-left:1.4em; } li { margin:0.3em 0; }
+</style>
+</head>
+<body>
+
+<h1>AgiBot X1 真机部署：基于 PACE 的系统性参数辨识方案</h1>
+<p style="color:#64748b; font-size:0.91em;">参考文献：Bjelonic et al., "Towards bridging the gap: Systematic sim-to-real transfer for diverse legged robots", arXiv:2509.06342, 2025</p>
+
+<!-- ============================================================ -->
+<h2>一、为什么用 PACE 替代当前 DR 方案</h2>
+
+<div class="compare-box">
+  <div class="compare-col">
+    <h4 style="color:#ef4444">❌ X1 当前方案（宽范围 DR）</h4>
+    <ul>
+      <li>Kp × [0.8, 1.2]，Kd × [0.8, 1.2]</li>
+      <li>lag_timesteps [5, 40]（8倍宽度）</li>
+      <li>joint_friction [0.01, 1.15]</li>
+      <li>策略被迫学会在极宽参数范围下生存 → 保守、僵硬</li>
+      <li>无法消除系统性偏差，只能覆盖</li>
+    </ul>
+  </div>
+  <div class="compare-col">
+    <h4 style="color:#16a34a">✅ PACE 方案（精确辨识）</h4>
+    <ul>
+      <li>辨识出精确的 I_a, d, τ_f, q̃_b, T_d</li>
+      <li>仿真与真机轨迹 MSE 最小化</li>
+      <li>策略在精确模型中训练 → 不需要动力学 DR</li>
+      <li>只保留任务层 DR（地形、推力）</li>
+      <li>ANYMAL 上 CoT 降低 32%，速度提升至 3 m/s</li>
+    </ul>
+  </div>
+</div>
+
+<div class="info">
+  <strong>核心思想：</strong>PACE 将"参数不确定性"从训练时的随机化转移到部署前的精确辨识。辨识只需 ~20s 的编码器数据（无需力矩传感器），用 CMA-ES 进化优化在 4096 个并行仿真环境中拟合真实轨迹，10~24 小时收敛（单张 RTX 3080）。
+</div>
+
+<!-- ============================================================ -->
+<h2>二、X1 的参数向量定义</h2>
+
+<p>对于 X1 的 12 个腿部关节（左右各 6 个），PACE 辨识的参数向量为：</p>
+
+<div class="formula-box">
+  \[
+  \mathbf{p} = [\mathbf{I}_a,\; \mathbf{d},\; \boldsymbol{\tau}_f,\; \tilde{\mathbf{q}}_b,\; T_d]^\top \in \mathbb{R}^{4 \times 12 + 1 = 49}
+  \]
+</div>
+
+<table>
+  <tr><th>参数</th><th>含义</th><th>X1 当前对应项</th><th>典型量级（参考 ANYmal）</th></tr>
+  <tr><td>\(I_a\)（每关节）</td><td>等效转动惯量（含齿轮箱折算）</td><td>未建模，在 DR 中隐含</td><td>1~10 × 10⁻² kg·m²</td></tr>
+  <tr><td>\(d\)（每关节）</td><td>粘性阻尼系数</td><td><code>joint_damping</code> DR [0.3,1.5]</td><td>0.1~5 N·m·s/rad</td></tr>
+  <tr><td>\(\tau_f\)（每关节）</td><td>库仑摩擦力矩</td><td><code>joint_friction</code> DR [0.01,1.15]</td><td>0.001~0.1 N·m</td></tr>
+  <tr><td>\(\tilde{q}_b\)（每关节）</td><td>关节零位偏置</td><td><code>motor_offset</code> DR [-0.035,0.035]</td><td>-0.02~0.02 rad</td></tr>
+  <tr><td>\(T_d\)（全局）</td><td>通信+推理总延迟</td><td><code>lag_timesteps</code> DR [5,40]×1ms</td><td>7.5 ms（ANYmal实测）</td></tr>
+</table>
+
+<div class="warn">
+  ⚠️ <strong>重要：PD 增益不参与辨识。</strong>由式 \(u_c \{I_a, d, P_\tau, D_\tau\}\) 的尺度不变性（论文 Eq.7），Kp/Kd 与 I_a, d 存在共线性，同时拟合会导致非唯一解。辨识时 Kp/Kd 固定为已知值。
+</div>
+
+<!-- ============================================================ -->
+<h2>三、整体流程</h2>
+
+<div class="flow-box">
+<span style="color:#1d4ed8;font-weight:bold;">【Stage 1】硬件准备</span>  机器人底座固定 + 腿部悬空，确保无地面接触
+  <span style="color:#94a3b8">↓</span>
+<span style="color:#1d4ed8;font-weight:bold;">【Stage 2】Chirp 数据采集</span>  以 chirp 信号激励所有关节，记录编码器位置（1000 Hz）
+  <span style="color:#94a3b8">↓</span>
+<span style="color:#1d4ed8;font-weight:bold;">【Stage 3】CMA-ES 参数辨识</span>  在 4096 个并行仿真中最小化真实与仿真轨迹的 MSE
+  <span style="color:#94a3b8">↓</span>
+<span style="color:#1d4ed8;font-weight:bold;">【Stage 4】辨识验证</span>  用独立 chirp 序列验证，绘制相轨迹对比图
+  <span style="color:#94a3b8">↓</span>
+<span style="color:#1d4ed8;font-weight:bold;">【Stage 5】策略重训练</span>  用辨识参数替换 DR，仅保留任务层随机化
+  <span style="color:#94a3b8">↓</span>
+<span style="color:#1d4ed8;font-weight:bold;">【Stage 6】落地步态验证</span>  零样本真机部署，测量速度跟踪误差和步态周期
+</div>
+
+<!-- ============================================================ -->
+<h2>四、Stage 1：硬件准备（固定底座，腿部悬空）</h2>
+
+<div class="phase">
+  <div class="phase-title">4.1 实验装置要求</div>
+  <p>这是 PACE 方案的核心前提条件，论文称之为 "fixed base, no contacts (legs free in air)"：</p>
+  <ul>
+    <li><strong>底座刚性固定：</strong>将 X1 躯干用螺栓固定在测试台架上，或用4个支撑点顶住底部，确保 base_link 完全静止。</li>
+    <li><strong>腿部完全悬空：</strong>所有12个关节可以自由运动，不与地面或其他物体接触。台架高度需保证腿部最大运动范围内无碰撞。</li>
+    <li><strong>消除交叉耦合：</strong>悬空状态下，每条腿的动力学仅受自身关节和固定底座影响，消除了腿间接触力的相互干扰。</li>
+  </ul>
+  <div class="info">
+    <strong>为什么必须悬空？</strong>落地状态下，地面反力是未知的外力，会混入辨识信号中，使 I_a 和 d 的估计产生系统性偏差。悬空状态下，关节运动仅受重力（已知）和自身动力学影响，辨识问题是适定的。
+  </div>
+</div>
+
+<div class="phase">
+  <div class="phase-title">4.2 固件模式确认</div>
+  <p>论文强调：辨识阶段和部署阶段必须使用<strong>完全相同的固件补偿模式</strong>（cogging 补偿、摩擦观测器等）。若辨识时启用了补偿，部署时也必须启用。否则补偿引入的"虚拟惯量"会产生无法消除的系统误差。</p>
+  <p>对于 X1，请确认并记录：</p>
+  <ul>
+    <li>电机驱动器固件版本</li>
+    <li>是否启用 cogging 补偿</li>
+    <li>是否启用摩擦前馈观测器</li>
+    <li>电流环带宽设置（影响等效力矩追踪延迟）</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>五、Stage 2：Chirp 信号数据采集</h2>
+
+<div class="phase">
+  <div class="phase-title">5.1 激励信号设计</div>
+  <p>PACE 使用 chirp（线性调频）信号而非阶跃信号，原因是 chirp 能在一次实验中覆盖完整频率范围，信息量远高于单频激励。</p>
+  <p>激励频率范围：从 f_min = 0.1 Hz 到 f_max，X1 的策略频率为 100 Hz，Nyquist 频率为 50 Hz。但机械结构刚度约束通常限制实际激励在 10 Hz 以内（论文建议覆盖步态最高频率的2倍，X1 步态约 1.43 Hz，因此至少覆盖 3 Hz，建议取 10 Hz）。</p>
+
+  <div class="formula-box">
+    \[
+    \hat{q}_j(t) = q_{j,0} + A_j \sin\!\left(2\pi \left(f_0 t + \frac{f_1 - f_0}{2T}t^2\right)\right)
+    \]
+    X1 参数：\(f_0=0.1\,\text{Hz},\; f_1=10\,\text{Hz},\; T=20\,\text{s},\; A_j = 0.3\,\text{rad}\)
+  </div>
+
+  <div class="warn">⚠️ 论文建议对称运动（左右腿对称）以消除净底座力矩。X1 为双足机器人，采集时左右同名关节同步施加反向对称 chirp，例如左髋 pitch +A·sin，右髋 pitch −A·sin。</div>
+</div>
+
+<div class="phase">
+  <div class="phase-title">5.2 采集脚本</div>
+<pre>import numpy as np
+import time, csv
+
+def generate_chirp(f0, f1, T, amplitude, dt=0.001):
+    """生成线性调频 chirp 序列"""
+    t = np.arange(0, T, dt)
+    phase = 2 * np.pi * (f0 * t + (f1 - f0) / (2 * T) * t**2)
+    return t, amplitude * np.sin(phase)
+
+def collect_chirp_data(robot_interface, joint_names, amplitude=0.3,
+                        f0=0.1, f1=10.0, duration=20.0, dt=0.001):
+    """
+    对所有关节同时施加 chirp，采集编码器数据
+    robot_interface: 机器人低层控制接口
+    joint_names: 关节名列表（与 x1_config 顺序一致）
+    """
+    t_arr, chirp = generate_chirp(f0, f1, duration, amplitude, dt)
+    n_joints = len(joint_names)
+
+    # 对称符号：左腿正相，右腿反相（抵消净力矩）
+    signs = np.array([1, 1, 1, 1, 1, 1,   # 左腿 6 关节
+                     -1,-1,-1,-1,-1,-1])    # 右腿 6 关节（对称）
+
+    q0 = robot_interface.get_positions()    # 当前零位
+    kps = np.array([30, 40, 35, 100, 35, 35]*2)   # 与 x1_config 一致
+    kds = np.array([ 3,  3,  4,  10, 0.5, 0.5]*2)
+
+    log = []  # [t, q_target(12), q_real(12)]
+
+    for i, t in enumerate(t_arr):
+        q_target = q0 + signs * chirp[i]
+        q_real   = robot_interface.get_positions()
+        dq_real  = robot_interface.get_velocities()
+
+        tau = kps * (q_target - q_real) - kds * dq_real
+        tau = np.clip(tau, -robot_interface.tau_limits, robot_interface.tau_limits)
+        robot_interface.send_torques(tau)
+
+        log.append(np.concatenate([[t], q_target, q_real]))
+        time.sleep(dt)
+
+    return np.array(log)   # shape: [T/dt, 1 + 12 + 12]
+
+# 采集 3 组（用于训练），1 组（用于验证）
+for trial in range(4):
+    log = collect_chirp_data(robot, joint_names)
+    np.save(f'chirp_data_trial{trial}.npy', log)
+    time.sleep(3.0)   # 等待关节静止</pre>
+</div>
+
+<div class="phase">
+  <div class="phase-title">5.3 采集参数汇总</div>
+  <table>
+    <tr><th>参数</th><th>PACE 论文值</th><th>X1 推荐值</th><th>说明</th></tr>
+    <tr><td>chirp 时长</td><td>20~60 s</td><td>20 s</td><td>覆盖 0.1~10 Hz</td></tr>
+    <tr><td>振幅</td><td>不指定</td><td>0.3 rad（~17°）</td><td>足够大以克服摩擦死区，但不超过关节限位</td></tr>
+    <tr><td>踝关节振幅</td><td>—</td><td>0.1 rad</td><td>踝关节 ωn 极高，幅度要小</td></tr>
+    <tr><td>采样率</td><td>400~10000 Hz</td><td>1000 Hz</td><td>与 sim_dt 一致，便于直接对比</td></tr>
+    <tr><td>采集组数</td><td>—</td><td>训练3组 + 验证1组</td><td>不同随机种子的 chirp</td></tr>
+    <tr><td>总数据量</td><td>~20 s/robot</td><td>80 s（4组×20s）</td><td>远少于执行器网络方案（需数分钟力矩数据）</td></tr>
+  </table>
+</div>
+
+<!-- ============================================================ -->
+<h2>六、Stage 3：CMA-ES 参数辨识</h2>
+
+<div class="phase">
+  <div class="phase-title">6.1 仿真回放原理</div>
+  <p>辨识的核心是：将采集到的真实关节目标轨迹 \(\hat{q}^{\text{real}}\) 以相同的速率输入到仿真中，用一组参数 \(\mathbf{p}\) 驱动仿真，比较仿真输出位置 \(q^{\text{sim}}\) 与真实位置 \(q^{\text{real}}\) 的差异：</p>
+  <div class="formula-box">
+    \[
+    \ell(\mathbf{p}) = \frac{1}{k}\sum_{i=1}^{k} \| q_i^{\text{real}} - q_i^{\text{sim}}(\mathbf{p}) \|^2
+    \]
+    \[
+    \mathbf{p}^* = \arg\min_{\mathbf{p}}\; \mathbb{E}[\ell(\mathbf{p})]
+    \]
+  </div>
+  <p>关键：仿真使用的控制律与真机完全一致：</p>
+  <div class="formula-box">
+    \[
+    \tau_t = P_\tau(\hat{q}_t + q_0 - q) - D_\tau \dot{q}
+    \]
+    其中 \(\hat{q}_t\) 是延迟 \(T_d\) 后的目标位置（ZOH 方式保持）
+  </div>
+</div>
+
+<div class="phase">
+  <div class="phase-title">6.2 IsaacGym 并行仿真辨识脚本（框架）</div>
+<pre>import torch
+import numpy as np
+from cmaes import CMA   # pip install cmaes
+
+# ---- 参数边界（参考 PACE 论文 Table 5 及 X1 物理约束）----
+PARAM_BOUNDS = {
+    'I_a':   (1e-4,  0.5),    # kg·m²，每关节
+    'd':     (0.01,  10.0),   # N·m·s/rad，每关节
+    'tau_f': (0.001, 2.0),    # N·m，每关节（库仑摩擦）
+    'q_b':   (-0.05, 0.05),   # rad，每关节（零位偏置）
+    'T_d':   (0.001, 0.050),  # s，全局延迟
+}
+N_JOINTS = 12
+N_PARAMS = 4 * N_JOINTS + 1  # = 49
+
+def params_to_vector(I_a, d, tau_f, q_b, T_d):
+    return np.concatenate([I_a, d, tau_f, q_b, [T_d]])
+
+def vector_to_params(p):
+    n = N_JOINTS
+    return p[:n], p[n:2*n], p[2*n:3*n], p[3*n:4*n], p[4*n]
+
+# ---- 仿真回放损失（在 IsaacGym 中并行运行 N=4096 个环境）----
+def simulate_and_score(p_batch, chirp_targets, chirp_real, sim_dt=0.001, N_envs=4096):
+    """
+    p_batch: [N_envs, 49] 参数矩阵（CMA-ES 采样的一批参数）
+    chirp_targets: [T, 12] 真机目标关节角序列
+    chirp_real: [T, 12] 真机实际关节角序列
+    返回: [N_envs] 每组参数的 MSE 损失
+    """
+    T = chirp_targets.shape[0]
+    losses = torch.zeros(N_envs, device='cuda')
+
+    # 初始化仿真状态
+    q_sim   = torch.zeros(N_envs, N_JOINTS, device='cuda')
+    dq_sim  = torch.zeros(N_envs, N_JOINTS, device='cuda')
+
+    I_a   = torch.tensor(p_batch[:, :N_JOINTS],           device='cuda')
+    d     = torch.tensor(p_batch[:, N_JOINTS:2*N_JOINTS],  device='cuda')
+    tau_f = torch.tensor(p_batch[:, 2*N_JOINTS:3*N_JOINTS],device='cuda')
+    q_b   = torch.tensor(p_batch[:, 3*N_JOINTS:4*N_JOINTS],device='cuda')
+    T_d   = torch.tensor(p_batch[:, 4*N_JOINTS],          device='cuda')  # [N_envs]
+
+    delay_steps = (T_d / sim_dt).long()   # 延迟步数，每个 env 可不同
+
+    kp = torch.tensor([30,40,35,100,35,35]*2, device='cuda', dtype=torch.float)
+    kd = torch.tensor([ 3, 3, 4,  10, .5,.5]*2, device='cuda', dtype=torch.float)
+    q0 = torch.tensor(chirp_real[0], device='cuda', dtype=torch.float)
+
+    for i in range(T):
+        # 取延迟后的目标（ZOH）
+        delayed_idx = torch.clamp(i - delay_steps, 0, T-1)   # [N_envs]
+        q_target = torch.tensor(chirp_targets[delayed_idx.cpu().numpy()],
+                                device='cuda', dtype=torch.float)  # [N_envs, 12]
+
+        # PD 控制律（与 sim2sim.py 一致）
+        tau = kp * (q_target + q0 - q_sim + q_b) - kd * dq_sim
+
+        # 库仑摩擦
+        tau_friction = tau_f * torch.sign(dq_sim)
+
+        # 单关节动力学：I_a * ddq = tau - d * dq - tau_friction
+        ddq = (tau - d * dq_sim - tau_friction) / I_a
+
+        # 欧拉积分
+        dq_sim = dq_sim + ddq * sim_dt
+        q_sim  = q_sim  + dq_sim * sim_dt
+
+        # 累计损失
+        q_real_t = torch.tensor(chirp_real[i], device='cuda', dtype=torch.float)
+        losses += ((q_sim - q_real_t)**2).mean(dim=1)
+
+    return (losses / T).cpu().numpy()
+
+# ---- CMA-ES 主循环 ----
+def run_cmaes(chirp_targets, chirp_real, n_iterations=100):
+    # 初始参数猜测
+    p0 = np.array([0.02]*12 + [1.0]*12 + [0.01]*12 + [0.0]*12 + [0.0075])
+    sigma0 = 0.1
+
+    optimizer = CMA(mean=p0, sigma=sigma0, bounds=np.array(
+        [(l,u) for k,(l,u) in PARAM_BOUNDS.items() for _ in range(N_JOINTS if k!='T_d' else 1)]
+    ))
+
+    for iteration in range(n_iterations):
+        # 采样一批参数
+        solutions = [optimizer.ask() for _ in range(optimizer.population_size)]
+        p_batch = np.array(solutions)  # [pop_size, 49]
+
+        # 并行仿真评估
+        losses = simulate_and_score(p_batch, chirp_targets, chirp_real)
+
+        # 告知 CMA-ES 结果
+        optimizer.tell([(sol, loss) for sol, loss in zip(solutions, losses)])
+
+        best_loss = min(losses)
+        print(f"Iter {iteration:3d} | best_loss = {best_loss:.6f}")
+
+        if best_loss < 1e-5:
+            print("收敛！")
+            break
+
+    return optimizer.mean   # 最优参数 p*</pre>
+</div>
+
+<div class="phase">
+  <div class="phase-title">6.3 收敛预期</div>
+  <table>
+    <tr><th>指标</th><th>PACE 论文结果</th><th>X1 预期</th></tr>
+    <tr><td>收敛迭代数</td><td>~100 次</td><td>100~150 次</td></tr>
+    <tr><td>收敛时间（RTX 3080）</td><td>10~24 h</td><td>12~20 h（49 参数）</td></tr>
+    <tr><td>最终 MSE</td><td>~10⁻²</td><td>目标 < 5×10⁻³ rad²</td></tr>
+    <tr><td>T_d 辨识精度</td><td>ANYmal: 7.5 ms</td><td>预期 3~10 ms</td></tr>
+    <tr><td>数据需求</td><td>~20 s encoder-only</td><td>80 s（4组×20s）</td></tr>
+  </table>
+</div>
+
+<!-- ============================================================ -->
+<h2>七、Stage 4：辨识结果验证</h2>
+
+<div class="phase">
+  <div class="phase-title">7.1 轨迹重叠验证</div>
+  <p>用辨识参数在仿真中回放验证集 chirp（未参与训练），对比仿真轨迹与真实轨迹的重叠程度——这是 PACE 论文 Figure 5d 和 Figure 10 展示的核心验证方法。</p>
+<pre>import matplotlib.pyplot as plt
+
+def validate_identification(p_star, chirp_valid_targets, chirp_valid_real):
+    """绘制真实 vs 仿真关节轨迹对比图"""
+    q_sim = replay_simulation(p_star, chirp_valid_targets)  # 用辨识参数仿真
+
+    fig, axes = plt.subplots(3, 4, figsize=(16, 9))
+    joint_names = ['L_hip_p','L_hip_r','L_hip_y','L_knee',
+                   'L_ank_p','L_ank_r','R_hip_p','R_hip_r',
+                   'R_hip_y','R_knee','R_ank_p','R_ank_r']
+    t = np.arange(len(q_sim)) * 0.001
+
+    for i, (ax, name) in enumerate(zip(axes.flat, joint_names)):
+        ax.plot(t, chirp_valid_real[:, i], 'b--', label='Real', lw=1)
+        ax.plot(t, q_sim[:, i],           'r-',  label='Sim (PACE)', lw=1)
+        ax.set_title(name, fontsize=9)
+        ax.legend(fontsize=7)
+
+    plt.suptitle('PACE Validation: Real vs Simulated Joint Trajectories')
+    plt.tight_layout()
+    plt.savefig('pace_validation.png', dpi=150)
+    plt.show()</pre>
+</div>
+
+<div class="phase">
+  <div class="phase-title">7.2 Delta 相轨迹验证</div>
+  <p>PACE 论文 Figure 1c 使用"Delta 相轨迹"（\(\Delta q\) vs \(\Delta \dot{q}\)）直观显示仿真与真实的差距。越接近原点，模型越精确：</p>
+<pre>def plot_delta_phase_portrait(p_star, chirp_targets, chirp_real, joint_idx=3):
+    """绘制膝关节的 Delta 相轨迹（参考论文 Figure 1c）"""
+    q_sim  = replay_simulation(p_star, chirp_targets)
+    dq_sim = np.gradient(q_sim, 0.001, axis=0)
+    dq_real = np.gradient(chirp_real, 0.001, axis=0)
+
+    dq = q_sim[:, joint_idx]  - chirp_real[:, joint_idx]   # 位置误差
+    ddq = dq_sim[:, joint_idx] - dq_real[:, joint_idx]     # 速度误差
+
+    plt.figure(figsize=(6, 6))
+    plt.scatter(dq, ddq, s=1, alpha=0.3, c='green', label='PACE')
+    plt.axhline(0, color='k', lw=0.5); plt.axvline(0, color='k', lw=0.5)
+    plt.xlabel('Δq [rad]'); plt.ylabel('Δq̇ [rad/s]')
+    plt.title('Delta Phase Portrait (closer to origin = better)')
+    plt.legend(); plt.tight_layout()
+    plt.savefig('delta_phase.png', dpi=150)</pre>
+
+  <div class="ok">✅ 验收标准：轨迹重叠后 MSE &lt; 5×10⁻³ rad²，Delta 相轨迹点集中在原点附近（半径 &lt; 0.05 rad），T_d 辨识值合理（3~15 ms）。</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>八、Stage 5：策略重训练</h2>
+
+<div class="phase">
+  <div class="phase-title">8.1 修改 x1_dh_stand_config.py</div>
+  <p>用辨识的精确参数替换原来的 DR 范围，同时<strong>移除动力学参数的 DR</strong>，只保留任务层随机化：</p>
+<pre>class domain_rand(LeggedRobotCfg.domain_rand):
+    # ========================================
+    # 原来的动力学 DR → 全部改为精确辨识值
+    # ========================================
+
+    # 原：stiffness_multiplier_range = [0.8, 1.2]
+    # 新：关闭 Kp/Kd 随机化（辨识已对齐）
+    randomize_gains = False
+
+    # 原：lag_timesteps_range = [5, 40]
+    # 新：用辨识的精确 T_d（例如 7 ms → 7 步）
+    add_lag = True
+    randomize_lag_timesteps = False   # 固定延迟
+    lag_timesteps_range = [7, 7]      # 辨识值，单位：sim steps (1ms)
+
+    # 原：joint_damping_range = [0.3, 1.5]
+    # 新：关闭，使用辨识的精确 d 值（在仿真中设置）
+    randomize_joint_damping = False
+
+    # 原：joint_friction_range = [0.01, 1.15]
+    # 新：关闭，使用辨识的精确 τ_f
+    randomize_joint_friction = False
+
+    # 原：joint_armature_range = [0.0001, 0.05]
+    # 新：使用辨识的精确 I_a
+    randomize_joint_armature = False
+
+    # ========================================
+    # 保留任务层 DR（地形、推力、质量、外部扰动）
+    # ========================================
+    push_robots = True
+    push_interval_s = 15
+    max_push_vel_xy = 1.5
+
+    randomize_base_mass = True
+    added_mass_range = [-3, 3]         # 保留
+
+    randomize_friction = True
+    friction_range = [0.2, 1.3]        # 保留（地面摩擦）</pre>
+</div>
+
+<div class="phase">
+  <div class="phase-title">8.2 在仿真中注入辨识参数</div>
+  <p>在 <code>legged_robot.py</code> 的 <code>_init_buffers()</code> 中，用辨识参数覆盖仿真的物理属性：</p>
+<pre># 辨识结果（从 CMA-ES 获得）
+p_star = np.load('pace_params_x1.npy')
+I_a_identified  = p_star[:12]     # kg·m²，每关节
+d_identified    = p_star[12:24]   # N·m·s/rad
+tau_f_identified = p_star[24:36]  # N·m
+q_b_identified  = p_star[36:48]   # rad
+T_d_identified  = p_star[48]      # s
+
+# 在 IsaacGym 仿真中设置每个 env 的物理属性
+for env_id in range(self.num_envs):
+    dof_props = self.gym.get_actor_dof_properties(...)
+    for j in range(12):
+        dof_props["armature"][j] = I_a_identified[j]
+        dof_props["damping"][j]  = d_identified[j]
+        dof_props["friction"][j] = tau_f_identified[j]
+    self.gym.set_actor_dof_properties(..., dof_props)</pre>
+</div>
+
+<!-- ============================================================ -->
+<h2>九、Stage 6：落地步态验证</h2>
+
+<div class="phase">
+  <div class="phase-title">9.1 首次落地前检查清单</div>
+  <table>
+    <tr><th>检查项</th><th>要求</th></tr>
+    <tr><td>辨识 MSE</td><td>&lt; 5×10⁻³ rad²（验证集）</td></tr>
+    <tr><td>T_d 辨识值</td><td>3~15 ms（超出此范围说明辨识异常）</td></tr>
+    <tr><td>辨识参数物理合理性</td><td>I_a &gt; 0，d &gt; 0，τ_f &gt; 0，|q_b| &lt; 0.05 rad</td></tr>
+    <tr><td>sim2sim.py 参数同步</td><td>kps/kds 与训练时一致，T_d 已对齐</td></tr>
+    <tr><td>关节软限位</td><td>与仿真训练时完全一致（论文特别强调）</td></tr>
+    <tr><td>固件模式</td><td>与辨识时完全相同</td></tr>
+  </table>
+</div>
+
+<div class="phase">
+  <div class="phase-title">9.2 步态周期测量（结合前文方法）</div>
+  <p>使用足端高度法（正运动学）测量实际步态周期，与 <code>cycle_time = 0.7 s</code> 对比：</p>
+<pre>def measure_gait_cycle_on_ground(log_q, t, L_thigh=0.35, L_shank=0.30):
+    """从落地行走的关节角度记录中测量步态周期"""
+    # 左脚足端高度（相对底座）
+    hip_p = log_q[:, 0]; knee_p = log_q[:, 3]; ank_p = log_q[:, 4]
+    z_foot_left = -(L_thigh*np.cos(hip_p) + L_shank*np.cos(hip_p - knee_p))
+
+    # 落地事件：足端高度低于阈值 + 从高到低（下降沿）
+    stance = z_foot_left < -0.60
+    landings = np.where(np.diff(stance.astype(int)) == 1)[0]   # 支撑相开始
+
+    if len(landings) >= 2:
+        # 同侧相邻两次落地 = 完整步态周期（左+右各一步）
+        cycles = np.diff(t[landings])
+        print(f"实测步态周期: {np.mean(cycles):.3f} ± {np.std(cycles):.3f} s")
+        print(f"设计值 cycle_time=0.7s，偏差: {abs(np.mean(cycles)-0.7)/0.7*100:.1f}%")</pre>
+</div>
+
+<div class="phase">
+  <div class="phase-title">9.3 速度跟踪性能评估</div>
+  <p>参考论文 Figure 6（Tytan）和 Figure 7（ANYmal）的评估方式，以开环速度指令回放测量跟踪误差：</p>
+  <table>
+    <tr><th>指标</th><th>ANYmal PACE 结果</th><th>X1 目标</th></tr>
+    <tr><td>前向速度跟踪误差（稳态）</td><td>~0.05 m/s</td><td>&lt; 0.1 m/s</td></tr>
+    <tr><td>加速响应时间（0→1 m/s）</td><td>~2 s</td><td>&lt; 3 s</td></tr>
+    <tr><td>步态周期偏差</td><td>—</td><td>&lt; 10%（即 ±0.07 s）</td></tr>
+    <tr><td>关节力矩跟踪（目标 vs 测量）</td><td>良好（Figure 6d）</td><td>相关系数 &gt; 0.9</td></tr>
+  </table>
+</div>
+
+<!-- ============================================================ -->
+<h2>十、X1 vs ANYmal 关键差异与注意事项</h2>
+
+<table>
+  <tr><th>方面</th><th>ANYmal（论文平台）</th><th>X1（本项目）</th><th>处理建议</th></tr>
+  <tr><td>腿部数量</td><td>四足</td><td>双足</td><td>对称 chirp 对称性不同，注意底座力矩平衡</td></tr>
+  <tr><td>关节数（腿部）</td><td>12</td><td>12</td><td>参数量相同，收敛时间预期一致</td></tr>
+  <tr><td>步态频率</td><td>~1.5 Hz（步行）</td><td>1.43 Hz（cycle_time=0.7）</td><td>chirp f_max 取 10 Hz 足够</td></tr>
+  <tr><td>执行器类型</td><td>谐波减速（高减速比）</td><td>PMSM（待确认）</td><td>若用直驱或低减速比，I_a 更小，d 更小</td></tr>
+  <tr><td>底座固定</td><td>吊架</td><td>建议固定台架</td><td>确保底座在 chirp 过程中完全静止</td></tr>
+  <tr><td>力矩传感器</td><td>无（仅编码器）</td><td>无</td><td>PACE 不需要力矩传感器，直接适用</td></tr>
+</table>
+
+<div class="danger">
+  ❗ <strong>踝关节特殊处理：</strong>X1 踝关节理论 ωn 极高（~150 rad/s），chirp 激励上限建议控制在 5 Hz 以内，振幅不超过 0.1 rad，否则可能触发电机保护。踝关节的 I_a 辨识值预期会远大于单链路 URDF 惯量（因为包含了减速箱折算惯量和足部等效惯量）。
+</div>
+
+<!-- ============================================================ -->
+<h2>十一、与现有 DR 方案的过渡策略</h2>
+
+<p>PACE 是完整替代方案，但如果时间紧张，可以分阶段过渡：</p>
+
+<div class="flow-box">
+<span style="font-weight:bold;color:#1d4ed8">第一阶段（1~2天）：仅辨识 T_d</span>
+  最容易辨识，只有 1 个参数，将 lag_timesteps_range 从 [5,40] 收窄到 [T_d±2, T_d±2]
+  预期效果：策略不再过于保守，响应更积极
+  <span style="color:#94a3b8">↓</span>
+<span style="font-weight:bold;color:#1d4ed8">第二阶段（3~5天）：辨识 I_a + d（全局均值）</span>
+  先假设所有同名关节参数相同，将 49 个参数降至 9 个（4类×2（髋/膝/踝）+ T_d）
+  用 DR 覆盖关节间的个体差异
+  <span style="color:#94a3b8">↓</span>
+<span style="font-weight:bold;color:#1d4ed8">第三阶段（1~2周）：完整 PACE 辨识</span>
+  49 参数全辨识，完全移除动力学 DR，实现零样本最优部署
+</div>
+
+<hr style="margin-top:3em; border-color:#e2e8f0;">
+<p style="color:#94a3b8; font-size:0.83em; text-align:center;">
+  AgiBot X1 · PACE 参数辨识真机部署方案 · 参考 Bjelonic et al., arXiv:2509.06342
+</p>
+</body>
+</html>
