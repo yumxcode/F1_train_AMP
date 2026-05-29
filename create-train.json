@@ -1,0 +1,26 @@
+{
+  "taskBaseInfo": {
+    "projectId": "PRO_20251113_021",
+    "taskType": "1",
+    "trainType": "1",
+    "taskName": "f1-v3-plus-fix-exp-20260528-005",
+    "taskDescription": "[OMA v3+ fix] feet_clearance clamp fix + continuous reward | commit: 2e2abdc",
+    "taskTag": ["oma", "f1-v3+"],
+    "goodsId": "ESKU000004",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "personalDataPath": "/personal"
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_locomotion.git\",\"versionType\":\"1\",\"versionName\":\"main\"}]",
+    "mainCodeUri": "humanoid/scripts/train.py",
+    "hparamsPath": "",
+    "startScript": "gm-run F1_locomotion/humanoid/scripts/train.py --task=x1_dh_stand --headless --max_iterations=30000",
+    "isOpen": "1"
+  },
+  "runtimeReminderConfig": {
+    "enableRuntimeReminder": false,
+    "reminderDurations": []
+  }
+}

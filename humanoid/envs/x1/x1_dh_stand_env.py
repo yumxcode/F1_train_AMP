@@ -152,9 +152,10 @@ class X1DHStandEnv(LeggedRobot):
 
     def _sample_forward_speed(self, env_ids):
         span = len(env_ids)
-        speed = torch_rand_float(0.6, self.command_ranges["lin_vel_x"][1], (span, 1), device=self.device).squeeze(1)
-        high_speed_mask = torch.rand(span, device=self.device) < 0.5
-        high_speed = torch_rand_float(0.95, self.command_ranges["lin_vel_x"][1], (span, 1), device=self.device).squeeze(1)
+        # [OMA] v3+ — 1.0s步态下理论限速 ~0.6m/s，采样集中在 0.3-0.6
+        speed = torch_rand_float(0.3, self.command_ranges["lin_vel_x"][1], (span, 1), device=self.device).squeeze(1)
+        high_speed_mask = torch.rand(span, device=self.device) < 0.3
+        high_speed = torch_rand_float(0.5, self.command_ranges["lin_vel_x"][1], (span, 1), device=self.device).squeeze(1)
         return torch.where(high_speed_mask, high_speed, speed)
 
 
@@ -856,23 +857,23 @@ class X1DHStandEnv(LeggedRobot):
 
     def _reward_low_speed(self):
         """
-        [OMA] v3 — 降低惩罚力度和阈值。原来 0.5*cmd 就判 too_low 打 -1.0，
-        在 DR 衰减下策略永远达不到，反而奖励站着不动。
-        改为 0.2*cmd 判 too_low，惩罚降低到 -0.3。
+        [OMA] v3+ — 低速版：命令范围 0.2-0.6m/s，阈值相应调低。
+        原来 0.5*cmd 就判 too_low 打 -1.0，
+        改为 0.3*cmd 判 too_low，惩罚降低到 -0.2。
         """
         absolute_speed = torch.abs(self.base_lin_vel[:, 0])
         absolute_command = torch.abs(self.commands[:, 0])
 
-        speed_too_low = absolute_speed < 0.2 * absolute_command   # 0.5 → 0.2
-        speed_desired = absolute_speed >= 0.2 * absolute_command  # 放宽预期范围
+        speed_too_low = absolute_speed < 0.3 * absolute_command   # 0.5 → 0.3
+        speed_desired = absolute_speed >= 0.3 * absolute_command
 
         sign_mismatch = torch.sign(self.base_lin_vel[:, 0]) != torch.sign(self.commands[:, 0])
 
         reward = torch.zeros_like(self.base_lin_vel[:, 0])
-        reward[speed_too_low] = -0.3          # -1.0 → -0.3
-        reward[speed_desired] = 0.6           # 1.2 → 0.6
-        reward[sign_mismatch] = -1.0          # -2.0 → -1.0
-        return reward * (self.commands[:, 0].abs() > 0.05)
+        reward[speed_too_low] = -0.2          # -1.0 → -0.2
+        reward[speed_desired] = 0.5           # 1.2 → 0.5
+        reward[sign_mismatch] = -0.8          # -2.0 → -0.8
+        return reward * (self.commands[:, 0].abs() > 0.03)
     
     def _reward_torques(self):
         """

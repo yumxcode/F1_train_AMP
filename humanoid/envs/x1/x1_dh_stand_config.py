@@ -302,7 +302,7 @@ class X1DHStandCfg(LeggedRobotCfg):
         
     class commands(LeggedRobotCfg.commands):
         curriculum = True
-        max_curriculum = 1.2
+        max_curriculum = 0.6
         # Vers: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         num_commands = 4
         resampling_time = 20.  # time before command are changed[s]
@@ -319,9 +319,9 @@ class X1DHStandCfg(LeggedRobotCfg):
         sw_switch = True # use stand_com_threshold or not
 
         class ranges:
-            lin_vel_x = [0.4, 1.2] # min max [m/s]
-            lin_vel_y = [-0.15, 0.15]   # min max [m/s]
-            ang_vel_yaw = [-0.3, 0.3]    # min max [rad/s]
+            lin_vel_x = [0.2, 0.6] # min max [m/s] — 1.0s步态下理论最大速度~0.6m/s
+            lin_vel_y = [-0.1, 0.1]   # min max [m/s]
+            ang_vel_yaw = [-0.2, 0.2]    # min max [rad/s]
             heading = [-3.14, 3.14]
 
     class rewards:
