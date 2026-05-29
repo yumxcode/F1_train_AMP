@@ -152,11 +152,11 @@ class X1DHStandEnv(LeggedRobot):
 
     def _sample_forward_speed(self, env_ids):
         span = len(env_ids)
-        # [OMA] v3+ — 1.0s步态下理论限速 ~0.6m/s，采样集中在 0.3-0.6
-        speed = torch_rand_float(0.3, self.command_ranges["lin_vel_x"][1], (span, 1), device=self.device).squeeze(1)
-        high_speed_mask = torch.rand(span, device=self.device) < 0.3
-        high_speed = torch_rand_float(0.5, self.command_ranges["lin_vel_x"][1], (span, 1), device=self.device).squeeze(1)
-        return torch.where(high_speed_mask, high_speed, speed)
+        # [OMA] v4 — 迭代步数驱动课程：前 500 iter 限制在低速，逐步放开到完整 0.6m/s
+        progress = min(self.common_step_counter / (500 * self.max_episode_length), 1.0)
+        max_speed = 0.3 + 0.3 * progress  # 从 0.3 渐近到 0.6
+        speed = torch_rand_float(0.2, max_speed, (span, 1), device=self.device).squeeze(1)
+        return speed
 
 
     def _push_robots(self):

@@ -86,7 +86,7 @@ class X1DHStandCfg(LeggedRobotCfg):
     class terrain(LeggedRobotCfg.terrain):
         # mesh_type = 'plane'
         mesh_type = 'trimesh'
-        curriculum = False
+        curriculum = True
         # rough terrain only:
         measure_heights = False
         static_friction = 0.6
@@ -302,7 +302,7 @@ class X1DHStandCfg(LeggedRobotCfg):
         
     class commands(LeggedRobotCfg.commands):
         curriculum = True
-        max_curriculum = 0.6
+        max_curriculum = 0.8
         # Vers: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         num_commands = 4
         resampling_time = 20.  # time before command are changed[s]
@@ -435,7 +435,7 @@ class X1DHStandCfgPPO(LeggedRobotCfgPPO):
         policy_class_name = 'ActorCriticDH'
         algorithm_class_name = 'DHPPO'
         num_steps_per_env = 24  # per iteration
-        max_iterations = 30000  # 20000 → 30000 更多迭代
+        max_iterations = 15000  # 课程表加速后不需要30000 iter
 
         # logging
         save_interval = 100  # check for potential saves every this many iterations
