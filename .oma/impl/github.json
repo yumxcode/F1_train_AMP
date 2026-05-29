@@ -1,7 +1,7 @@
 {
   "repo_url": "git@github.com:yumxcode/F1_locomotion.git",
   "branch": "main",
-  "commit_hash": "53e138b",
-  "commit_message": "[v3] 修复reward崩塌+降低DR强度+提高学习率",
-  "pushed_at": "2026-05-28T07:15:00Z"
+  "commit_hash": "e859316",
+  "commit_message": "[v3+] feet_clearance连续化+feet_air_time权重5.0+脚踝上翘+entropy微降",
+  "pushed_at": "2026-05-28T15:30:00Z"
 }

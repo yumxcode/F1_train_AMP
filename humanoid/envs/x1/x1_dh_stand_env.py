@@ -824,15 +824,15 @@ class X1DHStandEnv(LeggedRobot):
     
     def _reward_feet_clearance(self):
         """
-        [OMA] v3+ — 连续化腾空奖励，消除二元奖励的梯度消失问题。
-        原 reward = binary(>6cm)，策略抬1cm或5cm都是0。
-        新 reward = 1-exp(-30*h)，0→6cm 都有连续梯度。
+        [OMA] v3+ fix — 连续化腾空奖励，只用 swing phase 的正高度。
+        feet_z 在 stance 期可能为负（脚陷入地面），需要 clamp 到 0 以上。
+        连续奖励：0.00m→0.00, 0.02m→0.45, 0.04m→0.70, 0.06m→0.83, 0.10m→0.95
         """
-        contact = self.contact_forces[:, self.feet_indices, 2] > 5.
         feet_z = self.rigid_state[:, self.feet_indices, 2] - self.cfg.rewards.feet_to_ankle_distance
         swing_mask = 1 - self._get_stance_mask()
-        # 连续高度奖励：0.00m→0.00, 0.02m→0.45, 0.04m→0.70, 0.06m→0.83, 0.10m→0.95
-        height_factor = 1.0 - torch.exp(-feet_z * 30)
+        # 只取正高度，负值（脚在地面以下）clamp 到 0
+        feet_height = torch.clamp(feet_z, min=0.0)
+        height_factor = 1.0 - torch.exp(-feet_height * 30)
         rew = torch.sum(height_factor * swing_mask, dim=1)
         return rew
 
