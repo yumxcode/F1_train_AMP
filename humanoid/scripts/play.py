@@ -164,12 +164,16 @@ def play(args):
     for i in range(10*stop_state_log):
         
         actions = policy(obs.detach()) # * 0.
+        if i < 5:
+            print(f"[DIAG] actions: mean={actions.mean().item():.4f} std={actions.std().item():.4f} max={actions.max().item():.4f}")
         
         if FIX_COMMAND:
             env.commands[:, 0] = 0.5   # 1.0
             env.commands[:, 1] = 0
             env.commands[:, 2] = 0
             env.commands[:, 3] = 0.
+            if i < 5:
+                print(f"[DIAG] cmd[0]={env.commands[0,0].item():.4f} obs[:5]={obs[0,:5].tolist()}")
             
         else:
             env.commands[:, 0] = x_vel_cmd
