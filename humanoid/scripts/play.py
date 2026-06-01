@@ -166,7 +166,9 @@ def play(args):
         actions = policy(obs.detach()) # * 0.
         if i < 10:
             print(f"[DIAG] actions: mean={actions.mean().item():.4f} std={actions.std().item():.4f} max={actions.max().item():.4f}")
-            print(f"[DIAG] dof_vel mean={env.dof_vel.mean().item():.4f} base_h={env.root_states[0,2].item():.3f} lin_vel_x={env.base_lin_vel[0,0].item():.3f}")
+            # obs[0, -47:] = 最新帧
+            last = i > 0
+            print(f"[DIAG] dof_vel mean={env.dof_vel.mean().item():.4f} base_h={env.root_states[0,2].item():.3f} lin_vel_x={env.base_lin_vel[0,0].item():.3f} ep_len={env.episode_length_buf[0].item()}")
         
         if FIX_COMMAND:
             env.commands[:, 0] = 0.5   # 1.0
@@ -174,7 +176,9 @@ def play(args):
             env.commands[:, 2] = 0
             env.commands[:, 3] = 0.
             if i < 10:
-                print(f"[DIAG] cmd[0]={env.commands[0,0].item():.4f} obs[:5]={obs[0,:5].tolist()}")
+                # obs[0, -47:] = 最新帧（最后47维）
+                last_frame = obs[0, -47:]
+                print(f"[DIAG] cmd[0]={env.commands[0,0].item():.4f} last_frame[:5]={last_frame[:5].tolist()}")
             
         else:
             env.commands[:, 0] = x_vel_cmd
