@@ -493,7 +493,7 @@ class X1DHStandEnv(LeggedRobot):
                 cond = self.imu_lag_timestep > self.last_imu_lag_timestep + 1
                 self.imu_lag_timestep[cond] = self.last_imu_lag_timestep[cond] + 1
                 self.last_imu_lag_timestep = self.imu_lag_timestep.clone()
-            self.lagged_imu = self.imu_lag_buffer[torch.arange(self.num_envs), :, self.imu_lag_timestep.int()]
+            self.lagged_imu = self.imu_lag_buffer[torch.arange(self.num_envs), :, self.imu_lag_timestep.long()]
             self.lagged_base_ang_vel = self.lagged_imu[:,:3].clone()
             self.lagged_base_euler_xyz = self.lagged_imu[:,-3:].clone()
         # no imu lag
