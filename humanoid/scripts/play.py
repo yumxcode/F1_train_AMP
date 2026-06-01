@@ -106,8 +106,13 @@ def play(args):
     env_cfg.domain_rand.randomize_joint_damping = False
     env_cfg.domain_rand.randomize_joint_armature = False
     env_cfg.domain_rand.randomize_lag_timesteps = False
+    env_cfg.domain_rand.add_dof_lag = False          # [OMA] 关闭DOF观测延迟
+    env_cfg.domain_rand.add_imu_lag = False          # [OMA] 关闭IMU观测延迟
+    env_cfg.domain_rand.add_lag = False              # [OMA] 关闭动作延迟
+    env_cfg.domain_rand.randomize_coulomb_friction = False  # [OMA] 关闭库仑摩擦
     env_cfg.noise.curriculum = False
     env_cfg.commands.heading_command = False
+    env_cfg.commands.gait = ["walk_sagittal"]        # [OMA] 仅行走，去除stand干扰FIX_COMMAND
 
     train_cfg.seed = 123145
     print("train_cfg.runner_class_name:", train_cfg.runner_class_name)

@@ -433,6 +433,10 @@ class X1DHStandEnv(LeggedRobot):
         self.command_input = torch.cat(
             (sin_pos, cos_pos, self.commands[:, :3] * self.commands_scale), dim=1)
         
+        # [DIAG] obs command injection check (env 0)
+        if self.common_step_counter < 5:
+            print(f"[DIAG:compute_obs] step={self.common_step_counter} cmd[0]={self.commands[0,:3].tolist()} scale={self.commands_scale.tolist()} cmd_input[0]={self.command_input[0].tolist()}")
+        
         # critic no lag
         diff = self.dof_pos - self.ref_dof_pos
         # 73

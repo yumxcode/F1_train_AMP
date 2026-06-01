@@ -335,7 +335,8 @@ class X1DHStandCfg(LeggedRobotCfg):
         # final_swing_joint_pos = final_swing_joint_delta_pos + default_pos
         # [OMA] v2 — 脚踝(索引4,5,10,11) delta 置零，减少脚踝主动运动
         # [OMA] v3+ — 脚踝略微上翘(+0.15rad)，让摆动期脚尖抬起来更容易达到 clearance
-        final_swing_joint_delta_pos = [0.25, 0.05, -0.11, 0.35, 0.15, 0.0, -0.25, -0.05, 0.11, 0.35, 0.15, 0.0]
+        # [OMA] v5 — 髋外摆从0.05→0.15，增强摆动期重心转移；踝roll置零(脚尖不离地)
+        final_swing_joint_delta_pos = [0.25, 0.15, -0.11, 0.40, 0.15, 0.0, -0.25, -0.15, 0.11, 0.40, 0.15, 0.0]
         # [OMA] v2 — 抬腿高度提高，补偿执行器幅值不足
         target_feet_height = 0.06       # 0.04 → 0.06
         target_feet_height_max = 0.10   # 0.07 → 0.10 放宽上限
@@ -350,41 +351,42 @@ class X1DHStandCfg(LeggedRobotCfg):
         max_contact_force = 700  # forces above this value are penalized
         
         class scales:
-            # [OMA] v3 — 大幅降低 ref_joint_pos/stand_still，减少"站着不动"的收益
-            ref_joint_pos = 0.6             # 1.2 → 0.6
-            feet_clearance = 0.50           # 维持
+            # [OMA] v5 — 大幅调整奖励结构，让抬脚比拖脚走更划算
+            # 跟踪奖励调低，避免策略靠拖脚拿到全部收益
+            tracking_lin_vel = 2.5          # 4.0 → 2.5 ⬇️
+            tracking_ang_vel = 1.0
+            track_vel_hard = 0.3
+            vel_mismatch_exp = 0.5
+            low_speed = 0.3
+            stride_length = 0.25
+            # gait — 大幅提升，直接激励抬脚
+            feet_clearance = 3.0            # 0.50 → 3.0 🔺 抬脚核心激励
+            feet_air_time = 8.0             # 5.0 → 8.0 🔺
             feet_contact_number = 0.8
-            # gait
-            feet_air_time = 5.0             # 1.0 → 5.0 🔑 大幅提高腾空奖励权重
-            foot_slip = -0.20               # -0.40 → -0.20 降低，给策略探索空间
+            foot_slip = -0.20
+            toe_scuff = -0.5
             feet_distance = 0.2
             knee_distance = 0.2
-            # contact 
-            feet_contact_forces = -0.02     # -0.03 → -0.02
-            # vel tracking — 提高，让走路明确比站着划算
-            tracking_lin_vel = 4.0          # 3.0 → 4.0
-            tracking_ang_vel = 1.0
-            vel_mismatch_exp = 0.5
-            low_speed = 0.3                 # 1.0 → 0.3 🔑 大幅降低惩罚，避免"走路被罚"
-            track_vel_hard = 0.3            # 0.5 → 0.3
-            toe_scuff = -0.5                # -1.0 → -0.5 降低
-            stride_length = 0.25
-            # base pos
-            default_joint_pos = 0.5         # 0.8 → 0.5 再降
+            # base pos — 降低"保持默认姿态"的拉力
+            default_joint_pos = 0.15        # 0.5 → 0.15 ⬇️
             orientation = 1.0
             feet_rotation = 0.3
             base_height = 0.2
             base_acc = 0.2
-            # energy — 降低惩罚，让策略有尝试空间
-            action_smoothness = -0.05       # -0.15 → -0.05 大幅降低
-            torques = -1e-8                 # -5e-8 → -1e-8
-            dof_vel = -1e-8                 # -5e-8 → -1e-8
-            dof_acc = -2e-7                 # -1e-6 → -2e-7
-            collision = -2.0                # -5.0 → -2.0 🔑 大幅降低碰撞惩罚
-            stand_still = 1.0               # 2.5 → 1.0 🔑 降低站立收益
-            # [OMA] v3 — 脚踝惩罚降低（先让策略学会走，再优化细节）
-            ankle_torques = -0.01           # -0.03 → -0.01
-            ankle_motion = -0.03            # -0.10 → -0.03
+            # 参考步态跟踪
+            ref_joint_pos = 0.6
+            # contact 
+            feet_contact_forces = -0.02
+            # energy — 降低平滑惩罚，给策略抬脚空间
+            action_smoothness = -0.02       # -0.05 → -0.02 ⬇️
+            torques = -1e-8
+            dof_vel = -1e-8
+            dof_acc = -2e-7
+            collision = -1.0                # -2.0 → -1.0 ⬇️
+            stand_still = 0.3               # 1.0 → 0.3 ⬇️
+            # ankle
+            ankle_torques = -0.01
+            ankle_motion = -0.03
             # limits
             dof_vel_limits = -1
             dof_pos_limits = -10.
