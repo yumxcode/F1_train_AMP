@@ -409,7 +409,7 @@ class X1DHStandCfgPPO(LeggedRobotCfgPPO):
     runner_class_name = 'DHOnPolicyRunner'   # DWLOnPolicyRunner
 
     class policy:
-        init_noise_std = 1.0
+        init_noise_std = 1.5          # 1.0 → 1.5 [OMA v5.1] 增大初始探索，防止策略过早收敛到"拖脚"局部最优
         actor_hidden_dims = [512, 256, 128]
         critic_hidden_dims = [768, 256, 128]
         state_estimator_hidden_dims=[256, 128, 64]
@@ -422,7 +422,7 @@ class X1DHStandCfgPPO(LeggedRobotCfgPPO):
         in_channels = X1DHStandCfg.env.frame_stack
 
     class algorithm(LeggedRobotCfgPPO.algorithm):
-        entropy_coef = 0.003        # 0.005 → 0.003 降一点，避免过度探索
+        entropy_coef = 0.008        # 0.003 → 0.008 [OMA v5.1] 大幅提高熵奖励，对抗噪声std过早衰减，让策略探索抬脚
         learning_rate = 1e-4        # 3e-5 → 1e-4 加快收敛
         num_learning_epochs = 5     # 维持
         gamma = 0.99                # 0.994 → 0.99
