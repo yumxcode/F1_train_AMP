@@ -1,6 +1,0 @@
-{
-  "stage": "design",
-  "enteredAt": "2026-05-27T08:00:00Z",
-  "reason": "User invoked 'oma go design' — standalone design phase for X1 F1 algorithm improvement",
-  "missing_upstream": ["requirements.md", "knowledge.md"]
-}

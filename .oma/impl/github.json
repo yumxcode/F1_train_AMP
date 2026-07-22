@@ -1,7 +1,0 @@
-{
-  "repo_url": "git@github.com:yumxcode/F1_locomotion.git",
-  "branch": "main",
-  "commit_hash": "321bce2",
-  "commit_message": "[OMA v5] reward restructure: feet_clearance 3.0, tracking_lin_vel 2.5, fix play.py domain rand",
-  "pushed_at": "2026-06-01T10:30:00Z"
-}
