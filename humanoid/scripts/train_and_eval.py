@@ -80,7 +80,7 @@ def evaluate(env, runner, retarget_joints, args, seed):
                 jpe.append(float(torch.abs(env.dof_pos[0] - torch.as_tensor(retarget_joints[f], device=dev, dtype=torch.float)).mean()))
                 cf = env.contact_forces[:, env.feet_indices, 2]
                 cl.append(float(cf[0, 0] > 5.0)); cr.append(float(cf[0, 1] > 5.0))
-                dof = env.dof_pos[0]
+                dof = env.dof_pos[0].cpu().numpy()
                 viol += int(((dof < lims[:, 0]) | (dof > lims[:, 1])).sum())
                 if dones[0]:
                     fell = True; break
