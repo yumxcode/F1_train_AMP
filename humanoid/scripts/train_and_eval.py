@@ -56,15 +56,19 @@ def evaluate(env, runner, retarget_joints, args, seed):
     metrics = {k: [] for k in ["fall", "ep_len", "vx_err", "base_h", "pitch",
                                "jp_err", "dof_viol", "contact_l", "contact_r"]}
     for ep in range(EVAL_EPISODES):
-        env.reset_idx(torch.arange(env.num_envs))
-        obs = env.get_observations()
+        with torch.inference_mode():
+            env.reset_idx(torch.arange(env.num_envs))
+            obs = env.get_observations()
         steps = 0; fell = False
         bh, pt, ve, jpe, cl, cr = [], [], [], [], [], []
         viol = 0
         for _ in range(int(EPISODE_LEN_S / dt)):
-            with torch.no_grad():
+            # eval rollout must run ENTIRELY inside inference_mode (not just
+            # no_grad): the gymtorch extension enables a global inference mode
+            # and env.step does in-place tensor updates that raise outside it.
+            with torch.inference_mode():
                 actions = policy.act_inference(obs.detach())
-            obs, _, rew, dones, infos = env.step(actions)
+                obs, _, rew, dones, infos = env.step(actions)
             steps += 1
             bh.append(float(env.root_states[0, 2]))
             q = env.root_states[0, 3:7]
