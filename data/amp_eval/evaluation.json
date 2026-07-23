@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "evaluation-1.0",
+  "task": "x1_amp",
+  "frozen_spec": "data/task_spec.md (Gate C thresholds, frozen at amp_training entry)",
+  "status": "training_in_progress_eval_blocked_on_resume",
+  "training_runs": [
+    {
+      "task_id": "TASK_20260723_043",
+      "seed": 5, "max_iter": 15000,
+      "result": "ran iter 0-10 healthy (Mean reward 117.81, tracking_lin_vel 0.03->rising, AMP loaded expert_samples=336), terminated externally by account budget at 1.08M steps / 31s",
+      "completed": false,
+      "note": "full 15k run (~12h) exceeds single-task runtime/budget; bounded run used instead"
+    },
+    {
+      "task_id": "TASK_20260723_048",
+      "seed": 5, "max_iter": 2000, "completed": true,
+      "account": "golagen959@besteya.com",
+      "final_metrics": {
+        "iterations": 2000, "timesteps": 196608000, "duration_s": 2894,
+        "mean_reward": 49.2, "tracking_lin_vel_reward": 0.73,
+        "feet_clearance_reward": 0.86, "episode_length_steps": 1574,
+        "terrain_level": 5.87, "value_loss": 0.02, "surrogate_loss": -0.006
+      },
+      "checkpoint": "model_2000.pt (uploaded)",
+      "trend_note": "tracking_lin_vel reward rose 0.03 -> 0.73-0.86 (velocity tracking learned); episode stable (not falling); curriculum reached max terrain level 5.87 -> AMP closed loop produces real learning"
+    }
+  ],
+  "fixed_eval": {
+    "task_id": "TASK_20260723_069",
+    "status": "FAILED_on_resume",
+    "error": "FileNotFoundError: /workspace/F1_train_AMP/logs/x1_amp/exported_data — resumeFromTaskId checkpoint not auto-mounted to the local logs path the eval script expects (checkPointMountPath=None)",
+    "protocol": "5 seeds [5,17,42,123,2024], nominal vx=0.5, 24s episodes, metrics fall/vx_track/joint_err/base_h/pitch",
+    "blocking": "Gradmotion checkpoint-resume mount path not wired to task_registry.get_load_path() expectation; needs integration (copy/mount ckpt to logs dir) before fixed-eval can run"
+  },
+  "gate_c_assessment": {
+    "gate_passed": false,
+    "met": ["AMP closed-loop training runs and produces real learning (reward rising, stable episodes)"],
+    "unmet": [
+      "full-length training (2k/15k iter; partial)",
+      "5-seed fixed-eval (blocked on checkpoint resume path)",
+      "Sim2Sim regression (not yet run)",
+      "60s nominal no-fall eval, 95% episode success, frozen thresholds comparison"
+    ]
+  },
+  "evidence_paths": ["gm task logs TASK_20260723_048 (training metrics)", "gm task logs TASK_20260723_069 (eval failure)", "data/task_spec.md (frozen thresholds)"]
+}
