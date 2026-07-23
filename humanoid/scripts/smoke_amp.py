@@ -66,13 +66,59 @@ def smoke(args):
     # checkpoint save/resume probe
     ckpt = os.path.join(log_dir, f"model_{runner.current_learning_iteration}.pt")
     ckpt_ok = os.path.isfile(ckpt)
+
+    # === resume verification: reload the checkpoint and verify AMP state restores ===
+    # Save the post-train disc params + expert_logit_ema, then load the ckpt into a
+    # FRESH runner and assert the disc weights + EMA match exactly (resume-safe).
+    with torch.no_grad():
+        disc_post = torch.cat([p.detach().reshape(-1).clone()
+                               for p in runner.disc.parameters()])
+    ema_post = float(runner.expert_logit_ema)
+    resume_ok = False
+    resume_match = False
+    try:
+        runner2, _, _ = task_registry.make_alg_runner(
+            env=env, name=name, args=args, train_cfg=train_cfg)
+        # point to the saved ckpt and load
+        runner2.load(ckpt, load_optimizer=False)
+        with torch.no_grad():
+            disc_loaded = torch.cat([p.detach().reshape(-1)
+                                     for p in runner2.disc.parameters()])
+        ema_loaded = float(runner2.expert_logit_ema)
+        resume_ok = True
+        resume_match = bool(torch.allclose(disc_post, disc_loaded, atol=1e-6))
+        ema_match = abs(ema_post - ema_loaded) < 1e-6
+        resume_match = resume_match and ema_match
+        print(f"[smoke_amp] resume: disc_match={resume_match} "
+              f"ema_match={ema_match} (post={ema_post:.6f} loaded={ema_loaded:.6f})")
+    except Exception as e:
+        print(f"[smoke_amp] resume FAILED: {e}")
+
+    # === play verification: run inference steps with the loaded policy (no training) ===
+    play_ok = False
+    try:
+        obs = env.get_observations()
+        for _ in range(5):
+            with torch.no_grad():
+                actions = runner2.alg.actor_critic.act_inference(obs.detach())
+            obs, _, _, _, _ = env.step(actions)
+        play_ok = True
+        print("[smoke_amp] play: 5 inference steps completed OK")
+    except Exception as e:
+        print(f"[smoke_amp] play FAILED: {e}")
+
     print(f"[smoke_amp] disc_param_mean_delta={delta:.3e} finite={finite} "
-          f"ckpt={ckpt_ok} ({ckpt})")
+          f"ckpt={ckpt_ok} resume={resume_match} play={play_ok}")
     assert finite, "discriminator params became non-finite during smoke"
     assert delta > 0.0, "discriminator params did NOT update -> AMP not training"
     assert ckpt_ok, "no checkpoint written -> save path broken"
-    print("[smoke_amp] SMOKE OK: AMP closed loop executes, disc updates, ckpt saved.")
-    return {"disc_param_delta": delta, "finite": finite, "ckpt": ckpt}
+    assert resume_ok, "resume: checkpoint load failed"
+    assert resume_match, "resume: discriminator/EMA state did NOT match post-train"
+    assert play_ok, "play: inference rollout failed"
+    print("[smoke_amp] SMOKE OK: AMP closed loop executes, disc updates, "
+          "ckpt saved, resume verified, play verified.")
+    return {"disc_param_delta": delta, "finite": finite, "ckpt": ckpt,
+            "resume_match": resume_match, "play_ok": play_ok}
 
 
 if __name__ == "__main__":
