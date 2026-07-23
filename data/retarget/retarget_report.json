@@ -1,0 +1,141 @@
+{
+  "source": "data/0008_normal_walk4_stageii.npz",
+  "source_sha256": "5152128c89d8c7103c78a536370e49fb085514d5907970f1601c85fcf2a65715",
+  "source_fps": 120.0,
+  "n_frames": 405,
+  "method": "SMPL forward-kinematics + closed-form 2-link sagittal IK (keypoint-based, no axis-guessing)",
+  "joint_mapping": "SMPL 0pelvis/1Lhip/2Rhip/4Lknee/5Rknee/7Lank/8Rank (official smplx SMPL_JOINT_NAMES) -> X1 URDF dof_names",
+  "x1_link_lengths": {
+    "thigh": 0.305,
+    "shin": 0.305
+  },
+  "n_clip_violations": 96,
+  "finite_ok": true,
+  "range_ok": true,
+  "forward_velocity_mps": 1.6060766609112003,
+  "root_height_mean": 0.7,
+  "root_height_std": 0.01641416715857126,
+  "joint_stats": {
+    "left_hip_pitch_joint": {
+      "min": -0.10056376213615519,
+      "max": 0.4560139394316167,
+      "mean": 0.29162289240432865,
+      "std": 0.14999232005949104,
+      "limit": [
+        -0.9,
+        0.7
+      ]
+    },
+    "left_hip_roll_joint": {
+      "min": -0.25,
+      "max": 0.28349582566015996,
+      "mean": -0.011150332753395676,
+      "std": 0.18036541387741684,
+      "limit": [
+        -0.35,
+        0.35
+      ]
+    },
+    "left_hip_yaw_joint": {
+      "min": -0.31,
+      "max": -0.20666666666666667,
+      "mean": -0.30948971193415636,
+      "std": 0.00724357459364494,
+      "limit": [
+        -0.45,
+        0.45
+      ]
+    },
+    "left_knee_pitch_joint": {
+      "min": 0.32666666666666666,
+      "max": 1.45,
+      "mean": 0.6904955896971616,
+      "std": 0.3593500495416708,
+      "limit": [
+        0.0,
+        1.45
+      ]
+    },
+    "left_ankle_pitch_joint": {
+      "min": -0.23800696971580837,
+      "max": 0.09,
+      "mean": -0.12346946773500142,
+      "std": 0.12121603876862466,
+      "limit": [
+        -0.55,
+        0.45
+      ]
+    },
+    "left_ankle_roll_joint": {
+      "min": -0.19441391774048486,
+      "max": 0.14009749539609595,
+      "mean": -0.037573013305069757,
+      "std": 0.10947918708764781,
+      "limit": [
+        -0.3,
+        0.3
+      ]
+    },
+    "right_hip_pitch_joint": {
+      "min": -0.5329574622630023,
+      "max": 0.2908479428944931,
+      "mean": -0.2851413503056494,
+      "std": 0.24605132220844345,
+      "limit": [
+        -0.9,
+        0.7
+      ]
+    },
+    "right_hip_roll_joint": {
+      "min": -0.35,
+      "max": 0.17024311576552775,
+      "mean": -0.13693520347975097,
+      "std": 0.1727133278179231,
+      "limit": [
+        -0.35,
+        0.35
+      ]
+    },
+    "right_hip_yaw_joint": {
+      "min": 0.20666666666666667,
+      "max": 0.31,
+      "mean": 0.30948971193415636,
+      "std": 0.00724357459364494,
+      "limit": [
+        -0.45,
+        0.45
+      ]
+    },
+    "right_knee_pitch_joint": {
+      "min": 0.32666666666666666,
+      "max": 1.45,
+      "mean": 0.7451972152425179,
+      "std": 0.38462634034012483,
+      "limit": [
+        0.0,
+        1.45
+      ]
+    },
+    "right_ankle_pitch_joint": {
+      "min": -0.2764787311315011,
+      "max": 0.09,
+      "mean": -0.1277035056523382,
+      "std": 0.14799267537475633,
+      "limit": [
+        -0.55,
+        0.45
+      ]
+    },
+    "right_ankle_roll_joint": {
+      "min": -0.1941677586366762,
+      "max": 0.13214586945931664,
+      "mean": -0.052835175863660586,
+      "std": 0.10438829641462717,
+      "limit": [
+        -0.3,
+        0.3
+      ]
+    }
+  },
+  "output": "data/retarget/x1_walk_retargeted.npz"
+}

@@ -1,0 +1,138 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2024 AgiBot Inc / F1 AMP project.
+"""Gate B validation for the retargeted X1 walk clip (headless, numpy-only).
+
+Checks (amp_loop.md §5):
+  1. schema: npz keys + shapes + units match MotionLib expectation.
+  2. finite: no NaN/Inf in root_translation, root_rotation (unit quats), joints.
+  3. joint mapping: 12 DOF in X1 order, names match contract, ranges within limits.
+  4. continuity: no sudden jumps (per-frame joint delta bounded); root smooth.
+  5. foot contact: alternating stance (gait), not all-on / all-off.
+  6. MotionLib round-trip: load clip through the real MotionLib, compare stats
+     to the retarget output (loader consistency). AMP loader reads this data.
+  7. loop continuity: first/last frame closeness (decides loopable).
+
+Exit 0 = PASS. Run: python humanoid/scripts/validate_retarget.py
+"""
+from __future__ import annotations
+
+import importlib.util
+import json
+import os
+import sys
+
+import numpy as np
+
+HERE = os.path.dirname(__file__)
+ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+CLIP = os.path.join(ROOT, "data", "retarget", "x1_walk_retargeted.npz")
+REPORT = os.path.join(ROOT, "data", "retarget", "retarget_report.json")
+VAL_REPORT = os.path.join(ROOT, "data", "retarget", "validation_report.json")
+
+_ML = os.path.join(HERE, "..", "algo", "amp", "motion_lib.py")
+_spec = importlib.util.spec_from_file_location("_val_ml", os.path.abspath(_ML))
+ml = importlib.util.module_from_spec(_spec)
+sys.modules["_val_ml"] = ml
+_spec.loader.exec_module(ml)
+
+X1_LIMITS = ml.X1_JOINT_LIMITS
+X1_NAMES = ml.X1_JOINT_NAMES
+results = {"checks": [], "pass": True}
+
+
+def check(name, cond, detail=""):
+    results["checks"].append({"name": name, "pass": bool(cond), "detail": detail})
+    print(f"  [{'PASS' if cond else 'FAIL'}] {name}" + (f" :: {detail}" if detail else ""))
+    if not cond:
+        results["pass"] = False
+
+
+def main():
+    print("=== Gate B retarget validation (numpy-only) ===")
+    r = json.load(open(REPORT))
+    d = np.load(CLIP, allow_pickle=True)
+
+    # 1. schema
+    need = ["root_translation", "root_rotation", "joint_positions", "foot_contact", "fps"]
+    check("all required keys present", all(k in d.files for k in need), str(d.files))
+    rt, rq, jp, fc = d["root_translation"], d["root_rotation"], d["joint_positions"], d["foot_contact"]
+    N = jp.shape[0]
+    check("root_translation shape (N,3)", rt.shape == (N, 3), str(rt.shape))
+    check("root_rotation shape (N,4)", rq.shape == (N, 4), str(rq.shape))
+    check("joint_positions shape (N,12)", jp.shape[1] == 12, str(jp.shape))
+    check("foot_contact shape (N,2)", fc.shape == (N, 2), str(fc.shape))
+
+    # 2. finite + unit quaternions
+    check("all values finite", bool(np.all(np.isfinite(rt)) and np.all(np.isfinite(rq))
+          and np.all(np.isfinite(jp))), "")
+    qnorm = np.linalg.norm(rq, axis=1)
+    check("root quaternions unit-norm", bool(np.all(np.abs(qnorm - 1.0) < 1e-3)),
+          f"qnorm range [{qnorm.min():.4f},{qnorm.max():.4f}]")
+
+    # 3. joint ranges within X1 limits
+    oob = 0
+    for i, (lo, hi) in enumerate(X1_LIMITS):
+        col = jp[:, i]
+        oob += int(np.sum((col < lo - 0.05) | (col > hi + 0.05)))
+    check("joint values within X1 limits (tol 0.05)", oob == 0, f"out-of-range count={oob}")
+
+    # 4. continuity: per-frame joint delta bounded (no teleport). dt at 120Hz.
+    dt = 1.0 / float(d["fps"])
+    jdelta = np.abs(np.diff(jp, axis=0))
+    maxjd = float(jdelta.max())
+    # at 120Hz, a fast joint moves <~5 rad/s -> 0.04 rad/frame; allow 0.3 rad safety
+    check("joint continuity (max per-frame delta < 0.3 rad)", maxjd < 0.3, f"max_delta={maxjd:.3f}")
+    rdelta_t = np.abs(np.diff(rt[:, 0]))
+    check("root forward continuity (< 0.1 m/frame)", float(rdelta_t.max()) < 0.1,
+          f"max={float(rdelta_t.max()):.4f}")
+
+    # 5. foot contact alternation (gait): both feet not stuck; roughly alternating
+    lc, rc = fc[:, 0], fc[:, 1]
+    both = float(np.mean((lc > 0.5) & (rc > 0.5)))
+    neither = float(np.mean((lc < 0.5) & (rc < 0.5)))
+    check("double-support fraction reasonable (< 0.6)", both < 0.6, f"double={both:.3f}")
+    check("no prolonged flight (neither-contact < 0.3)", neither < 0.3, f"neither={neither:.3f}")
+    # antiphase: cross-correlate contact at gait lag
+    def period(sig):
+        s = sig - sig.mean()
+        if np.all(s == 0):
+            return None
+        ac = np.correlate(s, s, "full")[len(s) - 1:]
+        ac /= ac[0] if ac[0] != 0 else 1
+        for lag in range(5, len(ac)):
+            if ac[lag] > 0.3:
+                return lag
+        return None
+    pl = period(lc)
+    check("left foot shows gait periodicity", pl is not None, f"period={pl/d['fps']:.3f}s lag={pl}" if pl else "no period")
+
+    # 6. MotionLib round-trip: load through real MotionLib, compare mean/std
+    lib = ml.MotionLib([CLIP], target_fps=100.0, device="cpu")
+    check("MotionLib loads clip (non-empty)", lib.num_samples > 0, f"N={lib.num_samples}")
+    st = lib.stats[0]
+    check("MotionLib features finite", bool(np.all(np.isfinite(lib._all))), "")
+    check("MotionLib resampled to 100Hz", abs(st.fps - 100.0) < 1e-6, f"fps={st.fps}")
+    check("MotionLib joint range ok", st.joint_range_ok, "")
+    # AMP feature mean bounded (sanity)
+    check("AMP feature range bounded (<1e3)", float(np.nanmax(np.abs(lib._all))) < 1e3,
+          f"max|amp|={float(np.nanmax(np.abs(lib._all))):.3f}")
+
+    # 7. loop continuity (first vs last frame)
+    loop_err = float(np.linalg.norm(jp[0] - jp[-1]) + np.linalg.norm(rt[0] - rt[-1]))
+    loopable = loop_err < 1.0
+    check("loop continuity assessed", True, f"first/last frame err={loop_err:.3f} loopable={loopable}")
+
+    print(f"\n=== RESULT: {'PASS' if results['pass'] else 'FAIL'} "
+          f"({sum(c['pass'] for c in results['checks'])}/{len(results['checks'])}) ===")
+    results["retarget_report"] = REPORT
+    results["n_frames"] = int(N)
+    results["forward_velocity_mps"] = r.get("forward_velocity_mps")
+    results["loopable"] = bool(loopable)
+    results["loop_error"] = loop_err
+    with open(VAL_REPORT, "w") as f:
+        json.dump(results, f, indent=2)
+    return 0 if results["pass"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

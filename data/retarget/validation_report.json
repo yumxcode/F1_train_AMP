@@ -1,0 +1,105 @@
+{
+  "checks": [
+    {
+      "name": "all required keys present",
+      "pass": true,
+      "detail": "['root_translation', 'root_rotation', 'joint_positions', 'foot_contact', 'fps', 'note']"
+    },
+    {
+      "name": "root_translation shape (N,3)",
+      "pass": true,
+      "detail": "(405, 3)"
+    },
+    {
+      "name": "root_rotation shape (N,4)",
+      "pass": true,
+      "detail": "(405, 4)"
+    },
+    {
+      "name": "joint_positions shape (N,12)",
+      "pass": true,
+      "detail": "(405, 12)"
+    },
+    {
+      "name": "foot_contact shape (N,2)",
+      "pass": true,
+      "detail": "(405, 2)"
+    },
+    {
+      "name": "all values finite",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "root quaternions unit-norm",
+      "pass": true,
+      "detail": "qnorm range [1.0000,1.0000]"
+    },
+    {
+      "name": "joint values within X1 limits (tol 0.05)",
+      "pass": true,
+      "detail": "out-of-range count=0"
+    },
+    {
+      "name": "joint continuity (max per-frame delta < 0.3 rad)",
+      "pass": true,
+      "detail": "max_delta=0.213"
+    },
+    {
+      "name": "root forward continuity (< 0.1 m/frame)",
+      "pass": true,
+      "detail": "max=0.0174"
+    },
+    {
+      "name": "double-support fraction reasonable (< 0.6)",
+      "pass": true,
+      "detail": "double=0.037"
+    },
+    {
+      "name": "no prolonged flight (neither-contact < 0.3)",
+      "pass": true,
+      "detail": "neither=0.035"
+    },
+    {
+      "name": "left foot shows gait periodicity",
+      "pass": true,
+      "detail": "period=0.042s lag=5"
+    },
+    {
+      "name": "MotionLib loads clip (non-empty)",
+      "pass": true,
+      "detail": "N=336"
+    },
+    {
+      "name": "MotionLib features finite",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "MotionLib resampled to 100Hz",
+      "pass": true,
+      "detail": "fps=100.0"
+    },
+    {
+      "name": "MotionLib joint range ok",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "AMP feature range bounded (<1e3)",
+      "pass": true,
+      "detail": "max|amp|=196.557"
+    },
+    {
+      "name": "loop continuity assessed",
+      "pass": true,
+      "detail": "first/last frame err=5.777 loopable=False"
+    }
+  ],
+  "pass": true,
+  "retarget_report": "/Users/yumx/code/robot_x/X1/F1_train_AMP/data/retarget/retarget_report.json",
+  "n_frames": 405,
+  "forward_velocity_mps": 1.6060766609112003,
+  "loopable": false,
+  "loop_error": 5.776993911666329
+}
