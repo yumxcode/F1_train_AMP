@@ -1,0 +1,30 @@
+{
+  "taskBaseInfo": {
+    "taskName": "amp-eval-seed5-ckpt2000",
+    "taskDescription": "Gate C fixed eval of x1_amp checkpoint (resume from TASK_20260723_048 model_2000.pt). 5 seeds, frozen commands, stability+tracking+imitation metrics. repo F1_train_AMP branch amp-gateA-smoke @1b0d749.",
+    "projectId": "PRO_20251113_021",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "goodsId": "ESKU000001",
+    "goodsBackId": "SKUSL000002",
+    "gpuNum": 1,
+    "taskType": "1",
+    "trainType": "1",
+    "source": "0",
+    "personalDataPath": "/personal",
+    "taskTag": ["amp", "eval", "seed5"]
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "mainCodeName": "eval_amp.py",
+    "mainCodeType": "1",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/eval_amp.py",
+    "mainWorkDir": "F1_train_AMP",
+    "startScript": "gm-run F1_train_AMP/humanoid/scripts/eval_amp.py --task=x1_amp --headless",
+    "resumeFromTaskId": "TASK_20260723_048",
+    "resumeFromCheckPoint": "model_2000.pt",
+    "pullSubmodules": "1",
+    "isOpen": "1"
+  }
+}
