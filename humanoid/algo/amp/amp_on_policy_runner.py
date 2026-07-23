@@ -59,7 +59,16 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         self.motion_lib = MotionLib(clip_paths, target_fps=100.0, device=self.device) if clip_paths else None
         self.policy_amp_buffer = AMPReplayBuffer(disc_dim, int(amp_cfg.get("policy_buffer_capacity", 1_000_000)), device=self.device)
         self.register_buffer_compat = None
-        self.expert_logit_ema = torch.tensor(float(amp_cfg.get("expert_logit_ema_init", 0.0)), device=self.device)
+        # Build the expert-logit EMA tensor OUTSIDE any active inference_mode context.
+        # On Isaac-Gym hosts the gymtorch extension enables a global inference mode; a
+        # tensor created under it becomes an "inference tensor" and later .fill_()/
+        # in-place ops raise "Inplace update to inference tensor outside InferenceMode".
+        # We disable inference mode here so the EMA leaf is a normal autograd-tracked
+        # tensor (resume + reward-transform EMA update stay safe).
+        with torch.inference_mode(False):
+            self.expert_logit_ema = torch.tensor(
+                float(amp_cfg.get("expert_logit_ema_init", 0.0)),
+                device=self.device)
 
         # smoke-sanity: env must expose the AMP feature builder with matching dim
         if not hasattr(self.env, "compute_amp_obs"):
@@ -215,15 +224,16 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         if load_optimizer and "disc_optimizer_state_dict" in loaded_dict:
             self.disc_optimizer.load_state_dict(loaded_dict["disc_optimizer_state_dict"])
         if "expert_logit_ema" in loaded_dict:
-            # Rebuild the EMA tensor non-inplace: .fill_() on a tensor created inside
-            # InferenceMode (e.g. the __init__ default when play.py loads a checkpoint)
+            # Rebuild the EMA tensor non-inplace and OUTSIDE inference_mode: .fill_() on
+            # a tensor created inside InferenceMode (the __init__ default when play.py /
+            # resume loads a checkpoint under the gymtorch-enabled global inference mode)
             # raises "Inplace update to inference tensor outside InferenceMode" under
-            # PyTorch>=2.x. Recreating the leaf tensor from a plain python float avoids
-            # any autograd/inference-mode ownership of the tensor and is resume-safe.
-            self.expert_logit_ema = torch.tensor(
-                float(loaded_dict["expert_logit_ema"]),
-                dtype=self.expert_logit_ema.dtype,
-                device=self.expert_logit_ema.device)
+            # PyTorch>=2.x. torch.inference_mode(False) yields a normal autograd tensor.
+            with torch.inference_mode(False):
+                self.expert_logit_ema = torch.tensor(
+                    float(loaded_dict["expert_logit_ema"]),
+                    dtype=self.expert_logit_ema.dtype,
+                    device=self.expert_logit_ema.device)
         if "policy_amp_buffer_state" in loaded_dict:
             self.policy_amp_buffer.load_state_dict(loaded_dict["policy_amp_buffer_state"])
         self.current_learning_iteration = loaded_dict["iter"]
