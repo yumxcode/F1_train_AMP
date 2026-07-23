@@ -1,0 +1,32 @@
+{
+  "taskBaseInfo": {
+    "taskName": "amp-train-seed5-2k",
+    "taskDescription": "AMP training seed5 bounded 2000 iter (~90min): x1_amp, Gate-B expert. First meaningful training run to observe AMP reward/loss trends + checkpoint for eval. task_spec frozen.",
+    "projectId": "PRO_20251113_021",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "goodsId": "ESKU000001",
+    "goodsBackId": "SKUSL000002",
+    "gpuNum": 1,
+    "taskType": "1",
+    "trainType": "1",
+    "source": "0",
+    "personalDataPath": "/personal",
+    "taskTag": [
+      "amp",
+      "training",
+      "seed5"
+    ]
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "mainCodeName": "train_amp.py",
+    "mainCodeType": "1",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/train_amp.py",
+    "mainWorkDir": "F1_train_AMP",
+    "startScript": "gm-run F1_train_AMP/humanoid/scripts/train_amp.py --task=x1_amp --headless --seed=5 --num_envs=4096 --max_iterations=2000",
+    "pullSubmodules": "1",
+    "isOpen": "1"
+  }
+}
