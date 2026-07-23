@@ -1,0 +1,28 @@
+{
+  "taskBaseInfo": {
+    "taskName": "gateB-retarget-mujoco-replay2",
+    "taskDescription": "Gate B remote validation v2: numpy validate_retarget (19/19) + MuJoCo kinematic replay of retargeted X1 walk (ground penetration, self-collision, base height). repo F1_train_AMP branch amp-gateA-smoke @0fd36de.",
+    "projectId": "PRO_20251113_021",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "goodsId": "ESKU000001",
+    "goodsBackId": "SKUSL000002",
+    "gpuNum": 1,
+    "taskType": "1",
+    "trainType": "1",
+    "source": "0",
+    "personalDataPath": "/personal",
+    "taskTag": ["amp", "gateB-retarget"]
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "mainCodeName": "mujoco_replay_retarget.py",
+    "mainCodeType": "1",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/mujoco_replay_retarget.py",
+    "mainWorkDir": "F1_train_AMP",
+    "startScript": "python humanoid/scripts/validate_retarget.py && python humanoid/scripts/mujoco_replay_retarget.py",
+    "pullSubmodules": "1",
+    "isOpen": "1"
+  }
+}

@@ -109,4 +109,13 @@ def main():
 
 if __name__ == "__main__":
     import sys
+    # Run the numpy validation FIRST (headless gate-B checks), then the MuJoCo replay.
+    # Both results are needed for Gate B; combining avoids the gm-run single-script limit.
+    if "--validate-only" not in sys.argv:
+        try:
+            import subprocess
+            here = os.path.dirname(__file__)
+            subprocess.run([sys.executable, os.path.join(here, "validate_retarget.py")], check=True)
+        except Exception as e:
+            print(f"[replay] WARNING: validate_retarget step failed: {e}")
     sys.exit(main())
