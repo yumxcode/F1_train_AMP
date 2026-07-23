@@ -19,6 +19,8 @@ _REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
+# isaacgym MUST be imported before torch. Import it first.
+from isaacgym.torch_utils import *  # noqa: F401,F403  (ensures isaacgym loads first)
 import numpy as np
 import torch
 
