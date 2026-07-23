@@ -76,12 +76,13 @@ def smoke(args):
     ema_post = float(runner.expert_logit_ema)
     resume_ok = False
     resume_match = False
+    runner2 = None
     try:
         runner2, _, _ = task_registry.make_alg_runner(
             env=env, name=name, args=args, train_cfg=train_cfg)
-        # point to the saved ckpt and load
-        runner2.load(ckpt, load_optimizer=False)
+        # point to the saved ckpt and load (no_grad: state_dict ops need no autograd)
         with torch.no_grad():
+            runner2.load(ckpt, load_optimizer=False)
             disc_loaded = torch.cat([p.detach().reshape(-1)
                                      for p in runner2.disc.parameters()])
         ema_loaded = float(runner2.expert_logit_ema)
@@ -92,20 +93,25 @@ def smoke(args):
         print(f"[smoke_amp] resume: disc_match={resume_match} "
               f"ema_match={ema_match} (post={ema_post:.6f} loaded={ema_loaded:.6f})")
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"[smoke_amp] resume FAILED: {e}")
 
     # === play verification: run inference steps with the loaded policy (no training) ===
     play_ok = False
-    try:
-        obs = env.get_observations()
-        for _ in range(5):
-            with torch.no_grad():
-                actions = runner2.alg.actor_critic.act_inference(obs.detach())
-            obs, _, _, _, _ = env.step(actions)
-        play_ok = True
-        print("[smoke_amp] play: 5 inference steps completed OK")
-    except Exception as e:
-        print(f"[smoke_amp] play FAILED: {e}")
+    if runner2 is not None:
+        try:
+            obs = env.get_observations()
+            for _ in range(5):
+                with torch.no_grad():
+                    actions = runner2.alg.actor_critic.act_inference(obs.detach())
+                obs, _, _, _, _ = env.step(actions)
+            play_ok = True
+            print("[smoke_amp] play: 5 inference steps completed OK")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"[smoke_amp] play FAILED: {e}")
 
     print(f"[smoke_amp] disc_param_mean_delta={delta:.3e} finite={finite} "
           f"ckpt={ckpt_ok} resume={resume_match} play={play_ok}")

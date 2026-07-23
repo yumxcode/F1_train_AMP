@@ -215,7 +215,15 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         if load_optimizer and "disc_optimizer_state_dict" in loaded_dict:
             self.disc_optimizer.load_state_dict(loaded_dict["disc_optimizer_state_dict"])
         if "expert_logit_ema" in loaded_dict:
-            self.expert_logit_ema.fill_(float(loaded_dict["expert_logit_ema"]))
+            # Rebuild the EMA tensor non-inplace: .fill_() on a tensor created inside
+            # InferenceMode (e.g. the __init__ default when play.py loads a checkpoint)
+            # raises "Inplace update to inference tensor outside InferenceMode" under
+            # PyTorch>=2.x. Recreating the leaf tensor from a plain python float avoids
+            # any autograd/inference-mode ownership of the tensor and is resume-safe.
+            self.expert_logit_ema = torch.tensor(
+                float(loaded_dict["expert_logit_ema"]),
+                dtype=self.expert_logit_ema.dtype,
+                device=self.expert_logit_ema.device)
         if "policy_amp_buffer_state" in loaded_dict:
             self.policy_amp_buffer.load_state_dict(loaded_dict["policy_amp_buffer_state"])
         self.current_learning_iteration = loaded_dict["iter"]
