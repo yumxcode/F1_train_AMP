@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "amp-contract-1.0",
+  "task": "x1_amp",
+  "robot": {
+    "identity": "F1 is code-name for AgiBot X1 (xyber_x1)",
+    "urdf": "resources/robots/x1/urdf/x1.urdf",
+    "mjcf": "resources/robots/x1/mjcf/xyber_x1_flat.xml",
+    "num_actuated_dof": 12,
+    "foot_link": "ankle_roll",
+    "control_type": "P",
+    "policy_hz": 100,
+    "sim_dt": 0.001,
+    "decimation": 10,
+    "joint_order": [
+      "left_hip_pitch_joint", "left_hip_roll_joint", "left_hip_yaw_joint",
+      "left_knee_pitch_joint", "left_ankle_pitch_joint", "left_ankle_roll_joint",
+      "right_hip_pitch_joint", "right_hip_roll_joint", "right_hip_yaw_joint",
+      "right_knee_pitch_joint", "right_ankle_pitch_joint", "right_ankle_roll_joint"
+    ],
+    "default_dof_pos_rad": [0.4, 0.05, -0.31, 0.49, -0.21, 0.0, -0.4, -0.05, 0.31, 0.49, -0.21, 0.0]
+  },
+  "amp_observation": {
+    "dim": 35,
+    "blocks": {
+      "base_lin_vel": [0, 3],
+      "base_ang_vel": [3, 6],
+      "projected_gravity": [6, 9],
+      "dof_pos_rel": [9, 21],
+      "dof_vel": [21, 33],
+      "foot_contact": [33, 35]
+    },
+    "frame": "base (pelvis)",
+    "units": "rad, m/s, rad/s, m/s^2(gravity=9.81)",
+    "quaternion_order": "xyzw",
+    "up_axis": "z",
+    "state_only_disc": true,
+    "expert_builder": "humanoid/algo/amp/motion_lib.py:build_amp_obs_numpy",
+    "policy_builder": "humanoid/envs/x1/x1_amp_env.py:X1AMPEnv.compute_amp_obs",
+    "schema_parity": "expert and policy use the IDENTICAL feature layout/order/units/dt; verified by test_amp_contract.py 21/21"
+  },
+  "expert_transition": {
+    "clip_format": "npz",
+    "keys": ["root_translation (N,3) world m", "root_rotation (N,4) xyzw", "joint_positions (N,12) X1 order rad", "foot_contact (N,2) {0,1}", "fps scalar Hz"],
+    "source": "Gate B retargeted from data/0008_normal_walk4_stageii.npz (SMPL-X); Gate A smoke uses synthetic data/smoke_expert/walk_smoke.npz",
+    "loader": "humanoid/algo/amp/motion_lib.py:MotionLib",
+    "resample": "to 100 Hz policy rate",
+    "finite_check": "no NaN/Inf (asserted in MotionLib._validate_finite)",
+    "joint_range_check": "against cfg.safety.manual_joint_clip (X1_JOINT_LIMITS)"
+  },
+  "policy_transition": {
+    "collector": "humanoid/algo/amp/amp_on_policy_runner.py:AMPOnPolicyRunner._add_style_reward (calls env.compute_amp_obs each step)",
+    "replay_buffer": "humanoid/algo/amp/replay_buffer.py:AMPReplayBuffer",
+    "buffer_capacity": 1000000,
+    "buffer_persist": false,
+    "buffer_persist_reason": "transient reservoir refills every PPO iteration; persisting stale ptr/size over zero buffer would feed all-zero samples (silent corruption)"
+  },
+  "discriminator": {
+    "class": "humanoid/algo/amp/discriminator.py:Discriminator",
+    "architecture": "MLP [1024, 512] -> 1 (ELU), single logit D(x)",
+    "loss": "standard GAN: softplus(-D(expert)) + softplus(D(policy)) + R1 gradient penalty",
+    "grad_penalty_coef": 5.0,
+    "train_iters_per_ppo_iter": 2,
+    "batch_size": 4096,
+    "lr": 0.0001,
+    "optimizer": "Adam"
+  },
+  "style_reward": {
+    "formula": "r_style = clamp(1 - 0.25*(ema(D(expert)) - D(policy)), 0, 2)",
+    "sign": "reward INCREASES as policy logit rises toward expert (more expert-like)",
+    "weight": 1.0,
+    "expert_logit_ema_decay": 0.95,
+    "combination": "reward += style_weight * r_style BEFORE process_env_step (GAE observes it)",
+    "verification": "amp_algo_smoke_numpy.py: expert~0.99 > fake~0.012, monotonic increasing in logit"
+  },
+  "task_reward": {
+    "source": "X1AMPCfg.rewards.scales (inherited from x1_dh_stand, tracking_lin_vel down-weighted 2.5->1.5, ref_joint_pos 0.6->0.3 to leave room for style reward)",
+    "baseline": "x1_dh_stand plain PPO rewards UNCHANGED (regression control)"
+  },
+  "normalization": {
+    "amp_features": "NOT running-normalized (raw base-frame quantities + binary contacts)",
+    "ppo_obs": "env num_single_obs=47 stacked x66 frames; obs_scales per cfg.normalization; clip_observations=100"
+  },
+  "checkpoint_export": {
+    "save_keys": ["model_state_dict", "optimizer_state_dict", "es_optimizer_state_dict", "disc_state_dict", "disc_optimizer_state_dict", "expert_logit_ema", "policy_amp_buffer_state", "amp_style_weight", "iter"],
+    "resume_restores": "discriminator + disc_optimizer + expert_logit_ema (non-inplace torch.tensor rebuild for PyTorch>=2 safety); buffer intentionally reset",
+    "export": "JIT/ONNX via unchanged ActorCriticDH contract; AMP does not change deployed obs/action schema",
+    "resume_verification": "TASK_20260723_029: keys_ok=True disc_match=True ema_match=True"
+  },
+  "task_registration": {
+    "amp_task": "x1_amp -> X1AMPEnv + X1AMPCfg/X1AMPCfgPPO + AMPOnPolicyRunner (humanoid/envs/__init__.py:48)",
+    "baseline_task": "x1_dh_stand -> X1DHStandEnv + DHOnPolicyRunner (unchanged, humanoid/envs/__init__.py:47)",
+    "runner_resolution": "task_registry.py:155 eval(runner_class_name); AMPOnPolicyRunner imported at task_registry.py:40"
+  },
+  "gate_a_validation": {
+    "headless_algo_smoke": "10/10 PASS",
+    "headless_contract_test": "21/21 PASS",
+    "headless_runner_config": "4/4 PASS",
+    "gpu_smoke_task": "TASK_20260723_029 status=Completed ret:True",
+    "gpu_smoke_evidence": "disc_param_mean_delta=3.496e-04 finite=True ckpt=True resume_keys=True resume_match=True play=True; [smoke_amp] SMOKE OK",
+    "report": "data/gate_a_validation_report.md"
+  }
+}
