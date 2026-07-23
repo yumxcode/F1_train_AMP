@@ -18,6 +18,14 @@ Run (Isaac Gym host):
     python humanoid/scripts/smoke_amp.py --headless
 """
 import os
+import sys
+
+# Make the script robust to the working directory / checkout layout on remote
+# hosts: ensure the repo root (parent of humanoid/) is importable so
+# `from humanoid...` resolves regardless of where `gm-run` launches it from.
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 from humanoid.envs import *                      # noqa: F401,F403
 from humanoid.utils import get_args, task_registry
