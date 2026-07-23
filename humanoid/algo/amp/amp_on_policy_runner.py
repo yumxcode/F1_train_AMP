@@ -59,16 +59,7 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         self.motion_lib = MotionLib(clip_paths, target_fps=100.0, device=self.device) if clip_paths else None
         self.policy_amp_buffer = AMPReplayBuffer(disc_dim, int(amp_cfg.get("policy_buffer_capacity", 1_000_000)), device=self.device)
         self.register_buffer_compat = None
-        # Build the expert-logit EMA tensor OUTSIDE any active inference_mode context.
-        # On Isaac-Gym hosts the gymtorch extension enables a global inference mode; a
-        # tensor created under it becomes an "inference tensor" and later .fill_()/
-        # in-place ops raise "Inplace update to inference tensor outside InferenceMode".
-        # We disable inference mode here so the EMA leaf is a normal autograd-tracked
-        # tensor (resume + reward-transform EMA update stay safe).
-        with torch.inference_mode(False):
-            self.expert_logit_ema = torch.tensor(
-                float(amp_cfg.get("expert_logit_ema_init", 0.0)),
-                device=self.device)
+        self.expert_logit_ema = torch.tensor(float(amp_cfg.get("expert_logit_ema_init", 0.0)), device=self.device)
 
         # smoke-sanity: env must expose the AMP feature builder with matching dim
         if not hasattr(self.env, "compute_amp_obs"):
