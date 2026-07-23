@@ -55,10 +55,11 @@ def evaluate(env, runner, retarget_joints, args, seed):
     lims = np.array([[l, h] for l, h in X1_JOINT_LIMITS])
     metrics = {k: [] for k in ["fall", "ep_len", "vx_err", "base_h", "pitch",
                                "jp_err", "dof_viol", "contact_l", "contact_r"]}
+    dev = env.device
     for ep in range(EVAL_EPISODES):
-        with torch.inference_mode():
-            env.reset_idx(torch.arange(env.num_envs))
-            obs = env.get_observations()
+        # reset on the env's device (GPU); reset_idx needs a device-resident index tensor.
+        env.reset_idx(torch.arange(env.num_envs, device=dev))
+        obs = env.get_observations()
         steps = 0; fell = False
         bh, pt, ve, jpe, cl, cr = [], [], [], [], [], []
         viol = 0
