@@ -50,8 +50,8 @@ class X1AMPCfgPPO(X1DHStandCfgPPO):
         expert_logit_ema_init = 0.0
         # Policy transition replay buffer.
         policy_buffer_capacity = 1_000_000
-        # Expert motion clips (retargeted). For Gate A smoke we point at the synthetic clip.
-        # Real training replaces this with Gate B output (see data/retarget/).
+        # Expert motion clips. Real training (amp_training) uses the Gate-B validated
+        # retargeted clip. The synthetic smoke clip remains available for Gate-A smoke.
         expert_clip_paths = [
-            "{LEGGED_GYM_ROOT_DIR}/data/smoke_expert/walk_smoke.npz",
+            "{LEGGED_GYM_ROOT_DIR}/data/retarget/x1_walk_retargeted.npz",
         ]
