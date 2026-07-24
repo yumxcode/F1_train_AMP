@@ -42,7 +42,8 @@
     "hidden_dims": [1024, 512],
     "loss": "softplus GAN: expert_loss=softplus(-D(e)); policy_loss=softplus(D(p)); + R1 grad penalty (coef 5.0) on policy",
     "train_cadence": "disc_train_iters=2 updates per PPO iteration",
-    "batch_size": 4096 (smoke override 256)
+    "batch_size": 4096,
+    "batch_size_smoke_override": 256
   },
   "style_reward": {
     "formula": "r = clamp(1 - 0.25*(ema(D(expert)) - D(policy)), 0, 2)",

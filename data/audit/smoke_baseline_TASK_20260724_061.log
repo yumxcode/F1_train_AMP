@@ -1,0 +1,299 @@
+[SDK][INFO] 2026-07-24 14:56:21 Start scanning directory: /workspace[SDK][INFO] 2026-07-24 14:56:21 Obtained python dependency environment for training project[SDK][INFO] 2026-07-24 14:56:21 Task(TASK_20260724_061) status updated to: Running , ret:True[SDK][INFO] 2026-07-24 14:56:21 New file detected globally: /workspace/F1_train_AMP/humanoid/__pycache__/__init__.cpython-38.pyc[SDK][INFO] 2026-07-24 14:56:21 New file detected globally: /workspace/F1_train_AMP/humanoid/envs/__pycache__/__init__.cpython-38.pyc[SDK][INFO] 2026-07-24 14:56:21 New file detected globally: /workspace/F1_train_AMP/humanoid/envs/base/__pycache__/legged_robot.cpython-38.pyc[SDK][INFO] 2026-07-24 14:56:21 New file detected globally: /workspace/limx_rl/isaacgym/python/isaacgym/__pycache__/__init__.cpython-38.pyc.139629330362800[SDK][INFO] 2026-07-24 14:56:21 New file detected globally: /workspace/limx_rl/isaacgym/python/isaacgym/__pycache__/gymapi.cpython-38.pyc.139629330362928[SDK][INFO] 2026-07-24 14:56:21 New file detected globally: /workspace/limx_rl/isaacgym/python/isaacgym/__pycache__/gymdeps.cpython-38.pyc.139629326506032[SDK][INFO] 2026-07-24 14:56:22 New file detected globally: /workspace/limx_rl/isaacgym/python/isaacgym/__pycache__/torch_utils.cpython-38.pyc.139629269264400[SDK][INFO] 2026-07-24 14:56:24 New file detected globally: /workspace/limx_rl/isaacgym/python/isaacgym/__pycache__/gymtorch.cpython-38.pyc.139625348267312Importing module 'gym_38' (/workspace/limx_rl/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /workspace/limx_rl/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.1
+Device count 1
+/workspace/limx_rl/isaacgym/python/isaacgym/_bindings/src/gymtorch
+/opt/conda/envs/pointfoot_legged_gym/lib/python3.8/site-packages/_distutils_hack/__init__.py:54: UserWarning: Reliance on distutils from stdlib is deprecated. Users must rely on setuptools to provide the distutils module. Avoid importing distutils or import setuptools first, and avoid setting SETUPTOOLS_USE_DISTUTILS=stdlib. Register concerns at https://github.com/pypa/setuptools/issues/new?template=distutils-deprecation.yml
+  warnings.warn(
+Using /root/.cache/torch_extensions/py38_cu121 as PyTorch extensions root...
+Emitting ninja build file /root/.cache/torch_extensions/py38_cu121/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+[1/2] c++ -MMD -MF gymtorch.o.d -DTORCH_EXTENSION_NAME=gymtorch -DTORCH_API_INCLUDE_EXTENSION_H -DPYBIND11_COMPILER_TYPE=\"_gcc\" -DPYBIND11_STDLIB=\"_libstdcpp\" -DPYBIND11_BUILD_ABI=\"_cxxabi1011\" -isystem /opt/conda/envs/pointfoot_legged_gym/lib/python3.8/site-packages/torch/include -isystem /opt/conda/envs/pointfoot_legged_gym/lib/python3.8/site-packages/torch/include/torch/csrc/api/include -isystem /opt/conda/envs/pointfoot_legged_gym/lib/python3.8/site-packages/torch/include/TH -isystem /opt/conda/envs/pointfoot_legged_gym/lib/python3.8/site-packages/torch/include/THC -isystem /opt/conda/envs/pointfoot_legged_gym/include/python3.8 -D_GLIBCXX_USE_CXX11_ABI=0 -fPIC -std=c++17 -DTORCH_MAJOR=2 -DTORCH_MINOR=4 -c /workspace/limx_rl/isaacgym/python/isaacgym/_bindings/src/gymtorch/gymtorch.cpp -o gymtorch.o 
+[2/2] c++ gymtorch.o -shared -L/opt/conda/envs/pointfoot_legged_gym/lib/python3.8/site-packages/torch/lib -lc10 -ltorch_cpu -ltorch -ltorch_python -o gymtorch.so
+[SDK][INFO] 2026-07-24 14:56:40 New file detected globally: /workspace/limx_rl/isaacgym/python/isaacgym/__pycache__/gymutil.cpython-38.pyc.139625321074224[SDK][INFO] 2026-07-24 14:56:40 New file detected globally: /workspace/F1_train_AMP/humanoid/envs/base/__pycache__/base_task.cpython-38.pyc.139625321012784[SDK][INFO] 2026-07-24 14:56:40 New file detected globally: /workspace/F1_train_AMP/humanoid/utils/__pycache__/__init__.cpython-38.pyc[SDK][INFO] 2026-07-24 14:56:40 New file detected globally: /workspace/F1_train_AMP/humanoid/utils/__pycache__/helpers.cpython-38.pyc.139625321013040[SDK][INFO] 2026-07-24 14:56:40 New file detected globally: /workspace/F1_train_AMP/humanoid/utils/__pycache__/task_registry.cpython-38.pyc.139625323934384[SDK][INFO] 2026-07-24 14:56:40 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/__pycache__/__init__.cpython-38.pyc[SDK][INFO] 2026-07-24 14:56:40 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/__pycache__/vec_env.cpython-38.pyc.139625323934640[SDK][INFO] 2026-07-24 14:56:40 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/ppo/__pycache__/__init__.cpython-38.pyc.139625321010224[SDK][INFO] 2026-07-24 14:56:40 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/ppo/__pycache__/dh_ppo.cpython-38.pyc.139625321011504[SDK][INFO] 2026-07-24 14:56:40 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/ppo/__pycache__/actor_critic_dh.cpython-38.pyc.139625322127696[SDK][INFO] 2026-07-24 14:56:40 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/ppo/__pycache__/rollout_storage.cpython-38.pyc.139625322129568[SDK][INFO] 2026-07-24 14:56:40 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/ppo/__pycache__/dh_on_policy_runner.cpython-38.pyc.139625322234624[SDK][INFO] 2026-07-24 14:56:41 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/amp/__pycache__/__init__.cpython-38.pyc[SDK][INFO] 2026-07-24 14:56:41 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/amp/__pycache__/motion_lib.cpython-38.pyc.139625170929840[SDK][INFO] 2026-07-24 14:56:41 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/amp/__pycache__/discriminator.cpython-38.pyc.139625168890016[SDK][INFO] 2026-07-24 14:56:41 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/amp/__pycache__/replay_buffer.cpython-38.pyc.139625168890880[SDK][INFO] 2026-07-24 14:56:41 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/amp/__pycache__/amp_on_policy_runner.cpython-38.pyc.139625167745072[SDK][INFO] 2026-07-24 14:56:41 New file detected globally: /workspace/F1_train_AMP/humanoid/envs/base/__pycache__/legged_robot_config.cpython-38.pyc.139625323912480[SDK][INFO] 2026-07-24 14:56:41 New file detected globally: /workspace/F1_train_AMP/humanoid/envs/base/__pycache__/base_config.cpython-38.pyc.139625167747520[SDK][INFO] 2026-07-24 14:56:41 New file detected globally: /workspace/F1_train_AMP/humanoid/utils/__pycache__/logger.cpython-38.pyc.139625168911024[SDK][INFO] 2026-07-24 14:56:43 New file detected globally: /workspace/F1_train_AMP/humanoid/utils/__pycache__/math.cpython-38.pyc.139625138433840[SDK][INFO] 2026-07-24 14:56:43 New file detected globally: /workspace/F1_train_AMP/humanoid/utils/__pycache__/terrain.cpython-38.pyc.139625138433840[SDK][INFO] 2026-07-24 14:56:43 New file detected globally: /workspace/limx_rl/isaacgym/python/isaacgym/__pycache__/terrain_utils.cpython-38.pyc.139625138211120[SDK][INFO] 2026-07-24 14:56:43 New file detected globally: /workspace/F1_train_AMP/humanoid/envs/x1/__pycache__/x1_dh_stand_config.cpython-38.pyc[SDK][INFO] 2026-07-24 14:56:43 New file detected globally: /workspace/F1_train_AMP/humanoid/envs/x1/__pycache__/x1_dh_stand_env.cpython-38.pyc.139623897126352[SDK][INFO] 2026-07-24 14:56:43 New file detected globally: /workspace/F1_train_AMP/humanoid/envs/x1/__pycache__/x1_amp_config.cpython-38.pyc.139623897210144[SDK][INFO] 2026-07-24 14:56:43 New file detected globally: /workspace/F1_train_AMP/humanoid/envs/x1/__pycache__/x1_amp_env.cpython-38.pyc.139623893667888Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+[SDK][INFO] 2026-07-24 14:57:18 New file detected globally: /workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/events.out.tfevents.1784876238.rlt4090d-prod-4091-task-20260724-061-l9k29-run-rl-prod-10218419.214.0[SDK][INFO] 2026-07-24 14:57:18 Found Tensorboard data directory: /workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17[SDK][INFO] 2026-07-24 14:57:20 New file detected globally: /workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_0.pt[SDK][INFO] 2026-07-24 14:57:20 Found PT file directory: /workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17[SDK][INFO] 2026-07-24 14:57:20 Start scanning for new (*['.pt', '.pth', '.ckpt']) files in /workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17[SDK][INFO] 2026-07-24 14:57:20 Detected PT file (created or updated): /workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_0.pt[SDK][INFO] 2026-07-24 14:57:20 Found PT file: /workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_0.pt; Upload queue length: 1, put file_queue:{'tag': 'PT', 'content_type': 'application/octet-stream', 'upload_column': 'policUrl', 'try_count': 0, 'file_path': '/workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_0.pt'}Setting seed: 5
+['base_link', 'left_hip_pitch', 'left_hip_roll', 'left_hip_yaw', 'left_knee_pitch', 'left_ankle_pitch', 'left_ankle_roll', 'right_hip_pitch', 'right_hip_roll', 'right_hip_yaw', 'right_knee_pitch', 'right_ankle_pitch', 'right_ankle_roll']
+['left_ankle_roll', 'right_ankle_roll']
+'train_cfg' provided -> Ignoring 'name=x1_dh_stand'
+Actor MLP: Sequential(
+  (0): Linear(in_features=302, out_features=512, bias=True)
+  (1): ELU(alpha=1.0)
+  (2): Linear(in_features=512, out_features=256, bias=True)
+  (3): ELU(alpha=1.0)
+  (4): Linear(in_features=256, out_features=128, bias=True)
+  (5): ELU(alpha=1.0)
+  (6): Linear(in_features=128, out_features=12, bias=True)
+)
+Critic MLP: Sequential(
+  (0): Linear(in_features=219, out_features=768, bias=True)
+  (1): ELU(alpha=1.0)
+  (2): Linear(in_features=768, out_features=256, bias=True)
+  (3): ELU(alpha=1.0)
+  (4): Linear(in_features=256, out_features=128, bias=True)
+  (5): ELU(alpha=1.0)
+  (6): Linear(in_features=128, out_features=1, bias=True)
+)
+long_history CNN: Sequential(
+  (0): Conv1d(66, 32, kernel_size=(6,), stride=(3,))
+  (1): ReLU()
+  (2): Conv1d(32, 16, kernel_size=(4,), stride=(2,))
+  (3): ReLU()
+  (4): Flatten(start_dim=1, end_dim=-1)
+  (5): Linear(in_features=96, out_features=128, bias=True)
+  (6): ELU(alpha=1.0)
+  (7): Linear(in_features=128, out_features=64, bias=True)
+)
+state_estimator MLP: Sequential(
+  (0): Linear(in_features=235, out_features=256, bias=True)
+  (1): ELU(alpha=1.0)
+  (2): Linear(in_features=256, out_features=128, bias=True)
+  (3): ELU(alpha=1.0)
+  (4): Linear(in_features=128, out_features=64, bias=True)
+  (5): ELU(alpha=1.0)
+  (6): Linear(in_features=64, out_features=3, bias=True)
+)
+[DIAG:compute_obs] step=1 cmd[0]=[0.2426983267068863, 0.0, 0.0] scale=[2.0, 2.0, 1.0] cmd_input[0]=[0.06279052048921585, 0.9980267286300659, 0.4853966534137726, 0.0, 0.0]
+[DIAG:compute_obs] step=2 cmd[0]=[0.2426983267068863, 0.0, 0.0] scale=[2.0, 2.0, 1.0] cmd_input[0]=[0.12533323466777802, 0.9921147227287292, 0.4853966534137726, 0.0, 0.0]
+[DIAG:compute_obs] step=3 cmd[0]=[0.2426983267068863, 0.0, 0.0] scale=[2.0, 2.0, 1.0] cmd_input[0]=[0.1873813271522522, 0.9822872281074524, 0.4853966534137726, 0.0, 0.0]
+[DIAG:compute_obs] step=4 cmd[0]=[0.2426983267068863, 0.0, 0.0] scale=[2.0, 2.0, 1.0] cmd_input[0]=[0.2486899048089981, 0.9685831665992737, 0.4853966534137726, 0.0, 0.0]
+################################################################################
+                        [1m Learning iteration 0/5 [0m                        
+
+                       Computation: 265 steps/s (collection: 1.105s, learning 0.825s)
+               Value function loss: 0.0104
+                    Surrogate loss: -0.0696
+             Mean action noise std: 1.50
+Mean episode rew_action_smoothness: 0.0000
+     Mean episode rew_ankle_motion: 0.0000
+    Mean episode rew_ankle_torques: 0.0000
+         Mean episode rew_base_acc: 0.0000
+      Mean episode rew_base_height: 0.0000
+        Mean episode rew_collision: 0.0000
+Mean episode rew_default_joint_pos: 0.0000
+          Mean episode rew_dof_acc: 0.0000
+   Mean episode rew_dof_pos_limits: 0.0000
+Mean episode rew_dof_torque_limits: 0.0000
+          Mean episode rew_dof_vel: 0.0000
+   Mean episode rew_dof_vel_limits: 0.0000
+    Mean episode rew_feet_air_time: 0.0000
+   Mean episode rew_feet_clearance: 0.0000
+Mean episode rew_feet_contact_forces: 0.0000
+Mean episode rew_feet_contact_number: 0.0000
+    Mean episode rew_feet_distance: 0.0000
+    Mean episode rew_feet_rotation: 0.0000
+        Mean episode rew_foot_slip: 0.0000
+    Mean episode rew_knee_distance: 0.0000
+        Mean episode rew_low_speed: 0.0000
+      Mean episode rew_orientation: 0.0000
+    Mean episode rew_ref_joint_pos: 0.0000
+      Mean episode rew_stand_still: 0.0000
+    Mean episode rew_stride_length: 0.0000
+        Mean episode rew_toe_scuff: 0.0000
+          Mean episode rew_torques: 0.0000
+   Mean episode rew_track_vel_hard: 0.0000
+ Mean episode rew_tracking_ang_vel: 0.0000
+ Mean episode rew_tracking_lin_vel: 0.0000
+ Mean episode rew_vel_mismatch_exp: 0.0000
+        Mean episode terrain_level: 2.3906
+        Mean episode max_command_x: 0.6000
+--------------------------------------------------------------------------------
+                   Total timesteps: 512
+                    Iteration time: 1.93s
+                        Total time: 1.93s
+                               ETA: 9.6s
+
+################################################################################
+                        [1m Learning iteration 1/5 [0m                        
+
+                       Computation: 1411 steps/s (collection: 0.263s, learning 0.100s)
+               Value function loss: 0.0049
+                    Surrogate loss: -0.0593
+             Mean action noise std: 1.50
+Mean episode rew_action_smoothness: 0.0000
+     Mean episode rew_ankle_motion: 0.0000
+    Mean episode rew_ankle_torques: 0.0000
+         Mean episode rew_base_acc: 0.0000
+      Mean episode rew_base_height: 0.0000
+        Mean episode rew_collision: 0.0000
+Mean episode rew_default_joint_pos: 0.0000
+          Mean episode rew_dof_acc: 0.0000
+   Mean episode rew_dof_pos_limits: 0.0000
+Mean episode rew_dof_torque_limits: 0.0000
+          Mean episode rew_dof_vel: 0.0000
+   Mean episode rew_dof_vel_limits: 0.0000
+    Mean episode rew_feet_air_time: 0.0000
+   Mean episode rew_feet_clearance: 0.0000
+Mean episode rew_feet_contact_forces: 0.0000
+Mean episode rew_feet_contact_number: 0.0000
+    Mean episode rew_feet_distance: 0.0000
+    Mean episode rew_feet_rotation: 0.0000
+        Mean episode rew_foot_slip: 0.0000
+    Mean episode rew_knee_distance: 0.0000
+        Mean episode rew_low_speed: 0.0000
+      Mean episode rew_orientation: 0.0000
+    Mean episode rew_ref_joint_pos: 0.0000
+      Mean episode rew_stand_still: 0.0000
+    Mean episode rew_stride_length: 0.0000
+        Mean episode rew_toe_scuff: 0.0000
+          Mean episode rew_torques: 0.0000
+   Mean episode rew_track_vel_hard: 0.0000
+ Mean episode rew_tracking_ang_vel: 0.0000
+ Mean episode rew_tracking_lin_vel: 0.0000
+ Mean episode rew_vel_mismatch_exp: 0.0000
+        Mean episode terrain_level: 2.3906
+        Mean episode max_command_x: 0.6000
+--------------------------------------------------------------------------------
+                   Total timesteps: 1024
+                    Iteration time: 0.36s
+                        Total time: 2.29s
+                               ETA: 4.6s
+
+[SDK][WARN] 2026-07-24 14:57:21 Preparing upload task: {'tag': 'PT', 'content_type': 'application/octet-stream', 'upload_column': 'policUrl', 'try_count': 0, 'file_path': '/workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_0.pt'}; Task queue (0)[SDK][INFO] 2026-07-24 14:57:22 New file detected globally: /workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_5.ptLoading extension module gymtorch...
+F1_train_AMP/humanoid/scripts/smoke_baseline.py:66: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  sd = _torch.load(ckpt, map_location="cpu")
+################################################################################
+                        [1m Learning iteration 2/5 [0m                        
+
+                       Computation: 1445 steps/s (collection: 0.254s, learning 0.100s)
+               Value function loss: 0.0022
+                    Surrogate loss: -0.0508
+             Mean action noise std: 1.50
+Mean episode rew_action_smoothness: 0.0000
+     Mean episode rew_ankle_motion: 0.0000
+    Mean episode rew_ankle_torques: 0.0000
+         Mean episode rew_base_acc: 0.0000
+      Mean episode rew_base_height: 0.0000
+        Mean episode rew_collision: 0.0000
+Mean episode rew_default_joint_pos: 0.0000
+          Mean episode rew_dof_acc: 0.0000
+   Mean episode rew_dof_pos_limits: 0.0000
+Mean episode rew_dof_torque_limits: 0.0000
+          Mean episode rew_dof_vel: 0.0000
+   Mean episode rew_dof_vel_limits: 0.0000
+    Mean episode rew_feet_air_time: 0.0000
+   Mean episode rew_feet_clearance: 0.0000
+Mean episode rew_feet_contact_forces: 0.0000
+Mean episode rew_feet_contact_number: 0.0000
+    Mean episode rew_feet_distance: 0.0000
+    Mean episode rew_feet_rotation: 0.0000
+        Mean episode rew_foot_slip: 0.0000
+    Mean episode rew_knee_distance: 0.0000
+        Mean episode rew_low_speed: 0.0000
+      Mean episode rew_orientation: 0.0000
+    Mean episode rew_ref_joint_pos: 0.0000
+      Mean episode rew_stand_still: 0.0000
+    Mean episode rew_stride_length: 0.0000
+        Mean episode rew_toe_scuff: 0.0000
+          Mean episode rew_torques: 0.0000
+   Mean episode rew_track_vel_hard: 0.0000
+ Mean episode rew_tracking_ang_vel: 0.0000
+ Mean episode rew_tracking_lin_vel: 0.0000
+ Mean episode rew_vel_mismatch_exp: 0.0000
+        Mean episode terrain_level: 2.3906
+        Mean episode max_command_x: 0.6000
+--------------------------------------------------------------------------------
+                   Total timesteps: 1536
+                    Iteration time: 0.35s
+                        Total time: 2.65s
+                               ETA: 2.6s
+
+################################################################################
+                        [1m Learning iteration 3/5 [0m                        
+
+                       Computation: 1451 steps/s (collection: 0.253s, learning 0.100s)
+               Value function loss: 0.0011
+                    Surrogate loss: -0.0707
+             Mean action noise std: 1.50
+Mean episode rew_action_smoothness: 0.0000
+     Mean episode rew_ankle_motion: 0.0000
+    Mean episode rew_ankle_torques: 0.0000
+         Mean episode rew_base_acc: 0.0000
+      Mean episode rew_base_height: 0.0000
+        Mean episode rew_collision: 0.0000
+Mean episode rew_default_joint_pos: 0.0000
+          Mean episode rew_dof_acc: 0.0000
+   Mean episode rew_dof_pos_limits: 0.0000
+Mean episode rew_dof_torque_limits: 0.0000
+          Mean episode rew_dof_vel: 0.0000
+   Mean episode rew_dof_vel_limits: 0.0000
+    Mean episode rew_feet_air_time: 0.0000
+   Mean episode rew_feet_clearance: 0.0000
+Mean episode rew_feet_contact_forces: 0.0000
+Mean episode rew_feet_contact_number: 0.0000
+    Mean episode rew_feet_distance: 0.0000
+    Mean episode rew_feet_rotation: 0.0000
+        Mean episode rew_foot_slip: 0.0000
+    Mean episode rew_knee_distance: 0.0000
+        Mean episode rew_low_speed: 0.0000
+      Mean episode rew_orientation: 0.0000
+    Mean episode rew_ref_joint_pos: 0.0000
+      Mean episode rew_stand_still: 0.0000
+    Mean episode rew_stride_length: 0.0000
+        Mean episode rew_toe_scuff: 0.0000
+          Mean episode rew_torques: 0.0000
+   Mean episode rew_track_vel_hard: 0.0000
+ Mean episode rew_tracking_ang_vel: 0.0000
+ Mean episode rew_tracking_lin_vel: 0.0000
+ Mean episode rew_vel_mismatch_exp: 0.0000
+        Mean episode terrain_level: 2.3906
+        Mean episode max_command_x: 0.6000
+--------------------------------------------------------------------------------
+                   Total timesteps: 2048
+                    Iteration time: 0.35s
+                        Total time: 3.00s
+                               ETA: 1.5s
+
+################################################################################
+                        [1m Learning iteration 4/5 [0m                        
+
+                       Computation: 1438 steps/s (collection: 0.255s, learning 0.101s)
+               Value function loss: 0.0011
+                    Surrogate loss: -0.0536
+             Mean action noise std: 1.50
+Mean episode rew_action_smoothness: 0.0000
+     Mean episode rew_ankle_motion: 0.0000
+    Mean episode rew_ankle_torques: 0.0000
+         Mean episode rew_base_acc: 0.0000
+      Mean episode rew_base_height: 0.0000
+        Mean episode rew_collision: 0.0000
+Mean episode rew_default_joint_pos: 0.0000
+          Mean episode rew_dof_acc: 0.0000
+   Mean episode rew_dof_pos_limits: 0.0000
+Mean episode rew_dof_torque_limits: 0.0000
+          Mean episode rew_dof_vel: 0.0000
+   Mean episode rew_dof_vel_limits: 0.0000
+    Mean episode rew_feet_air_time: 0.0000
+   Mean episode rew_feet_clearance: 0.0000
+Mean episode rew_feet_contact_forces: 0.0000
+Mean episode rew_feet_contact_number: 0.0000
+    Mean episode rew_feet_distance: 0.0000
+    Mean episode rew_feet_rotation: 0.0000
+        Mean episode rew_foot_slip: 0.0000
+    Mean episode rew_knee_distance: 0.0000
+        Mean episode rew_low_speed: 0.0000
+      Mean episode rew_orientation: 0.0000
+    Mean episode rew_ref_joint_pos: 0.0000
+      Mean episode rew_stand_still: 0.0000
+    Mean episode rew_stride_length: 0.0000
+        Mean episode rew_toe_scuff: 0.0000
+          Mean episode rew_torques: 0.0000
+   Mean episode rew_track_vel_hard: 0.0000
+ Mean episode rew_tracking_ang_vel: 0.0000
+ Mean episode rew_tracking_lin_vel: 0.0000
+ Mean episode rew_vel_mismatch_exp: 0.0000
+        Mean episode terrain_level: 2.3906
+        Mean episode max_command_x: 0.6000
+--------------------------------------------------------------------------------
+                   Total timesteps: 2560
+                    Iteration time: 0.36s
+                        Total time: 3.35s
+                               ETA: 0.7s
+
+[smoke_baseline] task=x1_dh_stand (plain PPO, runner=DHOnPolicyRunner) ppo_param_mean_delta=2.656e-03 finite=True ckpt=True resume_keys=True plain_no_amp_state=True play=True
+[smoke_baseline] SMOKE OK: plain PPO baseline trains (params update), ckpt saved, resume-keys verified, no AMP state, play verified.
+[SDK][INFO] 2026-07-24 14:57:22 Detected PT file (created or updated): /workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_0.pt[SDK][INFO] 2026-07-24 14:57:22 Found PT file: /workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_0.pt; Upload queue length: 1, put file_queue:{'tag': 'PT', 'content_type': 'application/octet-stream', 'upload_column': 'policUrl', 'try_count': 0, 'file_path': '/workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_0.pt'}[SDK][INFO] 2026-07-24 14:57:22 Detected PT file (created or updated): /workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_5.pt[SDK][INFO] 2026-07-24 14:57:22 Found PT file: /workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_5.pt; Upload queue length: 2, put file_queue:{'tag': 'PT', 'content_type': 'application/octet-stream', 'upload_column': 'policUrl', 'try_count': 0, 'file_path': '/workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_5.pt'}[SDK][INFO] 2026-07-24 14:57:25 Task(TASK_20260724_061) status updated to: Completed , ret:True[SDK][INFO] 2026-07-24 14:57:28 PT file (model_0.pt) uploaded successfully[SDK][WARN] 2026-07-24 14:57:28 Preparing upload task: {'tag': 'PT', 'content_type': 'application/octet-stream', 'upload_column': 'policUrl', 'try_count': 0, 'file_path': '/workspace/F1_train_AMP/logs/x1_dh_stand/exported_data/2026-07-24_14-57-17/model_0.pt'}; Task queue (1)
