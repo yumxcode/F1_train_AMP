@@ -1,0 +1,1243 @@
+{
+  "schemaVersion": "graph-2.0",
+  "id": "amp_loop",
+  "version": 1,
+  "goal": "将 F1_train_AMP 从当前普通 PPO 行走项目改造成真正可训练、可评估、可导出的 AMP 项目；完成 F1 行走动作重定向并生成可靠的专家运动数据；最终训练 F1 使其能按参考步态稳定行走。该长周期任务按 amp_conversion → motion_retargeting → amp_training → completed 的门禁顺序推进，建立可恢复、可追溯、可重复迭代的工作流。",
+  "state": {
+    "iteration": {
+      "type": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "initial": 0,
+      "description": "已提交的迭代轮数"
+    },
+    "phase": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "amp_conversion",
+          "motion_retargeting",
+          "amp_training",
+          "completed"
+        ]
+      },
+      "initial": "amp_conversion",
+      "description": "当前门禁阶段"
+    },
+    "status": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "healthy",
+          "stale",
+          "pivot_required",
+          "attention_required",
+          "error",
+          "completed"
+        ]
+      },
+      "initial": "healthy",
+      "description": "确定性路由状态"
+    },
+    "stale_count": {
+      "type": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "initial": 0,
+      "description": "当前 phase 内连续无进展轮数"
+    },
+    "total_findings": {
+      "type": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "initial": 0,
+      "description": "累计 findings 数量"
+    },
+    "gate_passed": {
+      "type": {
+        "type": "boolean"
+      },
+      "initial": false,
+      "description": "当前阶段门禁是否通过"
+    },
+    "bootstrapped": {
+      "type": {
+        "type": "boolean"
+      },
+      "initial": false,
+      "description": "首次审计是否已完成"
+    }
+  },
+  "lanes": {
+    "research": {
+      "context": "persistent",
+      "maxConcurrency": 1,
+      "workspace": {
+        "read": [
+          "amp_loop.md",
+          "humanoid",
+          "resources",
+          "scripts",
+          "data",
+          "state",
+          "train_f1_v2.sh",
+          "monitor_train.sh"
+        ],
+        "write": [
+          {
+            "path": "humanoid",
+            "mode": "owned"
+          },
+          {
+            "path": "data",
+            "mode": "owned"
+          },
+          {
+            "path": "scripts",
+            "mode": "owned"
+          }
+        ],
+        "deny": [
+          ".git",
+          "state"
+        ]
+      },
+      "description": "连续研究上下文：amp_conversion 实现 AMP 闭环代码、motion_retargeting 执行重定向与回放复核、amp_training 设计训练与评测实验。拥有 humanoid 包、scripts 和数据产物目录的写权限。"
+    },
+    "control": {
+      "context": "persistent",
+      "maxConcurrency": 1,
+      "workspace": {
+        "read": [
+          "amp_loop.md",
+          "state",
+          "logs",
+          "humanoid",
+          "resources",
+          "scripts",
+          "data"
+        ],
+        "write": [
+          {
+            "path": "state/progress.json",
+            "mode": "atomic_replace"
+          },
+          {
+            "path": "state/task_spec.md",
+            "mode": "atomic_replace"
+          },
+          {
+            "path": "state/directions_tried.json",
+            "mode": "atomic_replace"
+          },
+          {
+            "path": "state/amp_contract.json",
+            "mode": "atomic_replace"
+          },
+          {
+            "path": "state/retarget_manifest.json",
+            "mode": "atomic_replace"
+          },
+          {
+            "path": "state/evaluation.json",
+            "mode": "atomic_replace"
+          },
+          {
+            "path": "state/findings.jsonl",
+            "mode": "append_only"
+          },
+          {
+            "path": "state/iteration_log.jsonl",
+            "mode": "append_only"
+          },
+          {
+            "path": "logs/work.jsonl",
+            "mode": "append_only"
+          },
+          {
+            "path": "logs/orchestrator.jsonl",
+            "mode": "append_only"
+          }
+        ],
+        "deny": [
+          ".git"
+        ]
+      },
+      "description": "确定性状态控制：依据语义判定更新 stale_count/status、做 gate 检查、原子写 state 文件、append findings 与 iteration log。写权限约束在 state/ 和 logs/。"
+    }
+  },
+  "nodes": {
+    "research": {
+      "type": "agent",
+      "lane": "research",
+      "prompt": "你是 F1 AMP 项目的研究执行 Agent。每轮读取 state/ 下的 task_spec.md、progress.json、directions_tried.json、amp_contract.json、retarget_manifest.json、evaluation.json 以及 amp_loop.md 中当前阶段的完整要求，然后执行当前 phase 的核心工作。\n\n按 phase 执行：\n- amp_conversion：审计现有仓库（核对 URDF/MJCF、自由度、actuated joint、关节上下限、默认姿态、关节顺序、body/link 名、足端定义、碰撞体、训练环境、task 注册、actor/critic、runner、PPO、rollout storage、train/play/export/Sim2Sim 数据流；搜索 AMP/motion loader/discriminator/expert replay buffer/style reward/retarget 工具；记录 X1 命名遗留），生成普通 PPO baseline 证据，然后实现完整 AMP 闭环代码并 smoke train 验证。\n- motion_retargeting：参照：https://github.com/Roboparty/GMR，新建GMR motion_retargeting, 基于 F1 模型做动作重定向，输出amp_conversion项目可用的模仿学习对象数据，并验证GMR后的结果可靠.\n amp_conversion和motion_retargeting的真实验证不要在本地，在gradmotion远端尝试执行 \n- amp_training：冻结固定评测阈值到 task_spec.md，启动远端训练（通过 bash 调用 Gradmotion CLI），约每 30 分钟轮询结果，进入平台期无改善趋势则终止并进入 findings 抽取。用 ≥5 seeds 固定评测。\n\n安全边界：\n- 一次只改一个主要假设并保留可比较 baseline。\n- 不得复用错误关节顺序/坐标系/物理参数或静默 drop/补零不匹配关节。\n- 不得在同一实验同时大改数据、算法、奖励与控制参数后声称归因成立。\n- 训练改善判定只采用固定评测结果。\n- 写入大体积数据到 data/ 下按原始/中间/训练版本化区分，不要写进 JSON state。\n- 远端训练时记录代码 revision、配置、数据 hash、seed、命令与 task ID（通过 findings_summary 传递给 control 写入 logs/orchestrator.jsonl）；余额不足时先 account-pool remove 再 account-pool get，有界重试。\n\n首次运行（bootstrapped=false）必须先做完整仓库审计并产出 baseline，不得从项目名推断已是 F1 或 AMP。若审计发现真实 F1 模型或合法参考源缺失，记录为 blocking precondition。\n\n输出路由事实（使用原始事实字段，不要预折叠布尔）：\n- new_findings_count：本轮新发现数（整数）。\n- trend：固定评测趋势，三态枚举 'improved'（有可复现新 finding 且结果改善）、'unchanged'（有 finding 但结果未改善）、'worsened'（固定评测显著变差）。\n- gate_passed：当前 Gate 全部必要证据是否满足（布尔）。仅在当前阶段的全部 Gate 检查项（见 amp_loop.md）逐一通过且证据已写入 state 时为 true。\n- gate_complete：仅当当前 phase 为 amp_training 且 gate_passed 为 true 且 next_phase 应为 completed 时设为 true；其余为 false。\n- outcome：三态枚举 'improved'（有新证据且改善或 Gate 通过）、'no_progress'（0 个 new findings 或 trend='worsened'）、'unrecoverable'（执行/数据损坏/外部任务失败且本轮无法恢复，或审计发现 F1 模型/参考源缺失）。此字段直接驱动确定性路由，不要用布尔替代。\n- error_detail：失败详情或空字符串。\n- direction_summary：本轮方向的简短描述。\n- findings_summary：本轮 findings 的结构化摘要，含证据绑定（日志/指标/视频/数据报告/代码 diff 的可读路径）。\n- code_revision：当前 git commit hash 或代码版本标识（用于 progress.json 的可追溯性）。\n- dataset_revision：当前专家数据/训练数据版本标识或 hash（用于 progress.json 的可追溯性；无数据变更时沿用上轮值）。\n- next_phase：gate_passed 且 gate_complete=false 时为下一阶段名；gate_complete=true 时为 'completed'；gate_passed=false 时为当前 phase 名。",
+      "systemInstructions": "你是 F1 AMP 项目的资深机器人学习研究员。你在 Isaac Gym / Legged Gym / DH_PPO 生态中有丰富经验。你的代码风格清晰、有类型标注、有文档。你严格遵守实验纪律。",
+      "inputs": {
+        "iteration": {
+          "ref": "$input.iteration"
+        },
+        "phase": {
+          "ref": "$input.phase"
+        },
+        "status": {
+          "ref": "$input.status"
+        },
+        "stale_count": {
+          "ref": "$input.stale_count"
+        },
+        "total_findings": {
+          "ref": "$input.total_findings"
+        },
+        "bootstrapped": {
+          "ref": "$input.bootstrapped"
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": [
+          "new_findings_count",
+          "trend",
+          "gate_passed",
+          "gate_complete",
+          "outcome",
+          "error_detail",
+          "direction_summary",
+          "findings_summary",
+          "code_revision",
+          "dataset_revision",
+          "next_phase"
+        ],
+        "properties": {
+          "new_findings_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "trend": {
+            "type": "string",
+            "enum": [
+              "improved",
+              "unchanged",
+              "worsened"
+            ]
+          },
+          "gate_passed": {
+            "type": "boolean"
+          },
+          "gate_complete": {
+            "type": "boolean"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "improved",
+              "no_progress",
+              "unrecoverable"
+            ]
+          },
+          "error_detail": {
+            "type": "string"
+          },
+          "direction_summary": {
+            "type": "string"
+          },
+          "findings_summary": {
+            "type": "string"
+          },
+          "code_revision": {
+            "type": "string"
+          },
+          "dataset_revision": {
+            "type": "string"
+          },
+          "next_phase": {
+            "type": "string",
+            "enum": [
+              "amp_conversion",
+              "motion_retargeting",
+              "amp_training",
+              "completed"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "tools": [
+        "read_file",
+        "write_file",
+        "edit_file",
+        "append_file",
+        "bash",
+        "glob",
+        "grep",
+        "web_fetch"
+      ],
+      "maxAttempts": 2,
+      "budget": {
+        "turns": 200,
+        "usd": 200,
+        "wallTimeMs": 1800000000
+      },
+      "lifetimeBudget": {
+        "turns": 1000,
+        "usd": 1000,
+        "elapsedMs": 432000000000
+      },
+      "timerPolicy": {
+        "allowHardPark": true,
+        "maxDelayMs": 1800000,
+        "maxParks": 48
+      }
+    },
+    "writer": {
+      "type": "agent",
+      "lane": "control",
+      "prompt": "你是确定性状态写入 Agent。你接收研究 Agent 的语义判定事实和路由目标，将当前 state 持久化到 state/progress.json（原子 replace），把 findings 追加到 state/findings.jsonl（append-only），把 iteration log 追加到 state/iteration_log.jsonl（append-only），把 work log 追加到 logs/work.jsonl（append-only）。\n\n不可违反的规则：\n- stale_count 与 status 的阈值逻辑已由 Graph Transition 的 Reducer 确定性计算并提交到 $state。你必须读取提交后的 $state 值来写 progress.json，不得自行计算或覆盖阈值。\n- 不得自由改写阈值或越权推进 phase。\n- progress.json 必须包含完整字段：iteration, phase, phase_status（=status）, status, stale_count, total_findings, gate_passed, code_revision, dataset_revision, updated_at（ISO 8601 当前时间）。code_revision 和 dataset_revision 从你的输入中读取，不得省略或自行编造。\n- findings.jsonl 每条记录一行 JSON：{iteration, phase, direction, summary, timestamp}。\n- iteration_log.jsonl 每条记录一行 JSON：{iteration, phase, status, stale_count, gate_passed, timestamp}。\n- 当 status 为 completed 时，额外写 state/evaluation.json 包含最终验收报告、最佳 checkpoint 路径、代码/配置/数据版本与复现命令。\n- 当 status 为 attention_required 时，额外写一份 attention 报告到 state/evaluation.json。\n- 当 status 为 error 时，额外写错误详情到 state/evaluation.json。\n- 当 route_hint 包含远程任务信息时，追加到 logs/orchestrator.jsonl。\n\n你的输入中 route_hint 告诉你当前轮次的路由目标，供你在 log 中记录。",
+      "systemInstructions": "你是确定性状态管理器。你只做原子写入和追加写入，不做任何计算或判断。所有阈值逻辑由 Graph 控制。",
+      "inputs": {
+        "iteration": {
+          "ref": "$input.iteration"
+        },
+        "phase": {
+          "ref": "$input.phase"
+        },
+        "status": {
+          "ref": "$input.status"
+        },
+        "stale_count": {
+          "ref": "$input.stale_count"
+        },
+        "total_findings": {
+          "ref": "$input.total_findings"
+        },
+        "gate_passed": {
+          "ref": "$input.gate_passed"
+        },
+        "direction_summary": {
+          "ref": "$input.direction_summary"
+        },
+        "findings_summary": {
+          "ref": "$input.findings_summary"
+        },
+        "route_hint": {
+          "ref": "$input.route_hint"
+        },
+        "new_findings_count": {
+          "ref": "$input.new_findings_count"
+        },
+        "trend": {
+          "ref": "$input.trend"
+        },
+        "code_revision": {
+          "ref": "$input.code_revision"
+        },
+        "dataset_revision": {
+          "ref": "$input.dataset_revision"
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": [
+          "written"
+        ],
+        "properties": {
+          "written": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "tools": [
+        "read_file",
+        "write_file",
+        "edit_file",
+        "append_file"
+      ],
+      "maxAttempts": 2,
+      "budget": {
+        "turns": 20,
+        "usd": 10,
+        "wallTimeMs": 1200000
+      }
+    },
+    "done": {
+      "type": "terminal",
+      "status": "done",
+      "result": {
+        "ref": "$input.result"
+      }
+    },
+    "failed": {
+      "type": "terminal",
+      "status": "failed",
+      "result": {
+        "ref": "$input.error"
+      }
+    },
+    "attention": {
+      "type": "terminal",
+      "status": "failed",
+      "result": {
+        "ref": "$input.result"
+      }
+    },
+    "exhausted": {
+      "type": "terminal",
+      "status": "exhausted",
+      "result": {
+        "ref": "$input.result"
+      }
+    }
+  },
+  "transitions": [
+    {
+      "id": "bootstrap_research",
+      "from": "research",
+      "on": "success",
+      "when": "$output.outcome != 'unrecoverable' && $state.bootstrapped == false",
+      "priority": 200,
+      "updates": [
+        {
+          "target": "bootstrapped",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": true
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "writer",
+        "inputs": {
+          "iteration": {
+            "ref": "$state.iteration"
+          },
+          "phase": {
+            "ref": "$state.phase"
+          },
+          "status": {
+            "literal": "healthy"
+          },
+          "stale_count": {
+            "literal": 0
+          },
+          "total_findings": {
+            "ref": "$state.total_findings"
+          },
+          "gate_passed": {
+            "ref": "$output.gate_passed"
+          },
+          "direction_summary": {
+            "ref": "$output.direction_summary"
+          },
+          "findings_summary": {
+            "ref": "$output.findings_summary"
+          },
+          "route_hint": {
+            "literal": "bootstrap_complete_continue"
+          },
+          "new_findings_count": {
+            "ref": "$output.new_findings_count"
+          },
+          "trend": {
+            "ref": "$output.trend"
+          },
+          "code_revision": {
+            "ref": "$output.code_revision"
+          },
+          "dataset_revision": {
+            "ref": "$output.dataset_revision"
+          }
+        }
+      }
+    },
+    {
+      "id": "error_route",
+      "from": "research",
+      "on": "success",
+      "when": "$output.outcome == 'unrecoverable'",
+      "priority": 190,
+      "updates": [
+        {
+          "target": "status",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "error"
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        },
+        {
+          "target": "total_findings",
+          "reducer": "builtin/add@1",
+          "args": [
+            {
+              "ref": "$output.new_findings_count"
+            }
+          ]
+        }
+      ],
+      "to": {
+        "node": "writer",
+        "inputs": {
+          "iteration": {
+            "ref": "$state.iteration"
+          },
+          "phase": {
+            "ref": "$state.phase"
+          },
+          "status": {
+            "literal": "error"
+          },
+          "stale_count": {
+            "ref": "$state.stale_count"
+          },
+          "total_findings": {
+            "ref": "$state.total_findings"
+          },
+          "gate_passed": {
+            "ref": "$output.gate_passed"
+          },
+          "direction_summary": {
+            "ref": "$output.direction_summary"
+          },
+          "findings_summary": {
+            "ref": "$output.findings_summary"
+          },
+          "route_hint": {
+            "literal": "error_write_and_stop"
+          },
+          "new_findings_count": {
+            "ref": "$output.new_findings_count"
+          },
+          "trend": {
+            "ref": "$output.trend"
+          },
+          "code_revision": {
+            "ref": "$output.code_revision"
+          },
+          "dataset_revision": {
+            "ref": "$output.dataset_revision"
+          }
+        }
+      }
+    },
+    {
+      "id": "gate_complete_route",
+      "from": "research",
+      "on": "success",
+      "when": "$output.gate_passed == true && $output.gate_complete == true && $output.outcome == 'improved'",
+      "priority": 185,
+      "updates": [
+        {
+          "target": "gate_passed",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": true
+            }
+          ]
+        },
+        {
+          "target": "stale_count",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": 0
+            }
+          ]
+        },
+        {
+          "target": "status",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "completed"
+            }
+          ]
+        },
+        {
+          "target": "phase",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "completed"
+            }
+          ]
+        },
+        {
+          "target": "total_findings",
+          "reducer": "builtin/add@1",
+          "args": [
+            {
+              "ref": "$output.new_findings_count"
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "writer",
+        "inputs": {
+          "iteration": {
+            "ref": "$state.iteration"
+          },
+          "phase": {
+            "ref": "$state.phase"
+          },
+          "status": {
+            "literal": "completed"
+          },
+          "stale_count": {
+            "literal": 0
+          },
+          "total_findings": {
+            "ref": "$state.total_findings"
+          },
+          "gate_passed": {
+            "literal": true
+          },
+          "direction_summary": {
+            "ref": "$output.direction_summary"
+          },
+          "findings_summary": {
+            "ref": "$output.findings_summary"
+          },
+          "route_hint": {
+            "literal": "gate_complete_write_final_report_and_exit"
+          },
+          "new_findings_count": {
+            "ref": "$output.new_findings_count"
+          },
+          "trend": {
+            "ref": "$output.trend"
+          },
+          "code_revision": {
+            "ref": "$output.code_revision"
+          },
+          "dataset_revision": {
+            "ref": "$output.dataset_revision"
+          }
+        }
+      }
+    },
+    {
+      "id": "gate_advance",
+      "from": "research",
+      "on": "success",
+      "when": "$output.gate_passed == true && $output.gate_complete == false && $output.outcome == 'improved'",
+      "priority": 180,
+      "updates": [
+        {
+          "target": "gate_passed",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": true
+            }
+          ]
+        },
+        {
+          "target": "stale_count",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": 0
+            }
+          ]
+        },
+        {
+          "target": "status",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "healthy"
+            }
+          ]
+        },
+        {
+          "target": "phase",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "ref": "$output.next_phase"
+            }
+          ]
+        },
+        {
+          "target": "total_findings",
+          "reducer": "builtin/add@1",
+          "args": [
+            {
+              "ref": "$output.new_findings_count"
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "writer",
+        "inputs": {
+          "iteration": {
+            "ref": "$state.iteration"
+          },
+          "phase": {
+            "ref": "$state.phase"
+          },
+          "status": {
+            "literal": "healthy"
+          },
+          "stale_count": {
+            "literal": 0
+          },
+          "total_findings": {
+            "ref": "$state.total_findings"
+          },
+          "gate_passed": {
+            "literal": true
+          },
+          "direction_summary": {
+            "ref": "$output.direction_summary"
+          },
+          "findings_summary": {
+            "ref": "$output.findings_summary"
+          },
+          "route_hint": {
+            "literal": "gate_passed_advance_phase"
+          },
+          "new_findings_count": {
+            "ref": "$output.new_findings_count"
+          },
+          "trend": {
+            "ref": "$output.trend"
+          },
+          "code_revision": {
+            "ref": "$output.code_revision"
+          },
+          "dataset_revision": {
+            "ref": "$output.dataset_revision"
+          }
+        }
+      }
+    },
+    {
+      "id": "attention_route",
+      "from": "research",
+      "on": "success",
+      "when": "$output.outcome == 'no_progress' && $state.bootstrapped == true && $state.stale_count >= 3",
+      "priority": 170,
+      "updates": [
+        {
+          "target": "stale_count",
+          "reducer": "builtin/increment@1"
+        },
+        {
+          "target": "status",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "attention_required"
+            }
+          ]
+        },
+        {
+          "target": "total_findings",
+          "reducer": "builtin/add@1",
+          "args": [
+            {
+              "ref": "$output.new_findings_count"
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "writer",
+        "inputs": {
+          "iteration": {
+            "ref": "$state.iteration"
+          },
+          "phase": {
+            "ref": "$state.phase"
+          },
+          "status": {
+            "literal": "attention_required"
+          },
+          "stale_count": {
+            "ref": "$state.stale_count"
+          },
+          "total_findings": {
+            "ref": "$state.total_findings"
+          },
+          "gate_passed": {
+            "ref": "$output.gate_passed"
+          },
+          "direction_summary": {
+            "ref": "$output.direction_summary"
+          },
+          "findings_summary": {
+            "ref": "$output.findings_summary"
+          },
+          "route_hint": {
+            "literal": "attention_write_report_and_stop"
+          },
+          "new_findings_count": {
+            "ref": "$output.new_findings_count"
+          },
+          "trend": {
+            "ref": "$output.trend"
+          },
+          "code_revision": {
+            "ref": "$output.code_revision"
+          },
+          "dataset_revision": {
+            "ref": "$output.dataset_revision"
+          }
+        }
+      }
+    },
+    {
+      "id": "pivot_route",
+      "from": "research",
+      "on": "success",
+      "when": "$output.outcome == 'no_progress' && $state.bootstrapped == true && $state.stale_count >= 1",
+      "priority": 160,
+      "updates": [
+        {
+          "target": "stale_count",
+          "reducer": "builtin/increment@1"
+        },
+        {
+          "target": "status",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "pivot_required"
+            }
+          ]
+        },
+        {
+          "target": "total_findings",
+          "reducer": "builtin/add@1",
+          "args": [
+            {
+              "ref": "$output.new_findings_count"
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "writer",
+        "inputs": {
+          "iteration": {
+            "ref": "$state.iteration"
+          },
+          "phase": {
+            "ref": "$state.phase"
+          },
+          "status": {
+            "literal": "pivot_required"
+          },
+          "stale_count": {
+            "ref": "$state.stale_count"
+          },
+          "total_findings": {
+            "ref": "$state.total_findings"
+          },
+          "gate_passed": {
+            "ref": "$output.gate_passed"
+          },
+          "direction_summary": {
+            "ref": "$output.direction_summary"
+          },
+          "findings_summary": {
+            "ref": "$output.findings_summary"
+          },
+          "route_hint": {
+            "literal": "pivot_required_structural_pivot"
+          },
+          "new_findings_count": {
+            "ref": "$output.new_findings_count"
+          },
+          "trend": {
+            "ref": "$output.trend"
+          },
+          "code_revision": {
+            "ref": "$output.code_revision"
+          },
+          "dataset_revision": {
+            "ref": "$output.dataset_revision"
+          }
+        }
+      }
+    },
+    {
+      "id": "stale_route",
+      "from": "research",
+      "on": "success",
+      "when": "$output.outcome == 'no_progress' && $state.bootstrapped == true && $state.stale_count < 1",
+      "priority": 150,
+      "updates": [
+        {
+          "target": "stale_count",
+          "reducer": "builtin/increment@1"
+        },
+        {
+          "target": "status",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "stale"
+            }
+          ]
+        },
+        {
+          "target": "total_findings",
+          "reducer": "builtin/add@1",
+          "args": [
+            {
+              "ref": "$output.new_findings_count"
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "writer",
+        "inputs": {
+          "iteration": {
+            "ref": "$state.iteration"
+          },
+          "phase": {
+            "ref": "$state.phase"
+          },
+          "status": {
+            "literal": "stale"
+          },
+          "stale_count": {
+            "ref": "$state.stale_count"
+          },
+          "total_findings": {
+            "ref": "$state.total_findings"
+          },
+          "gate_passed": {
+            "ref": "$output.gate_passed"
+          },
+          "direction_summary": {
+            "ref": "$output.direction_summary"
+          },
+          "findings_summary": {
+            "ref": "$output.findings_summary"
+          },
+          "route_hint": {
+            "literal": "stale_choose_diverse_direction"
+          },
+          "new_findings_count": {
+            "ref": "$output.new_findings_count"
+          },
+          "trend": {
+            "ref": "$output.trend"
+          },
+          "code_revision": {
+            "ref": "$output.code_revision"
+          },
+          "dataset_revision": {
+            "ref": "$output.dataset_revision"
+          }
+        }
+      }
+    },
+    {
+      "id": "healthy_route",
+      "from": "research",
+      "on": "success",
+      "default": true,
+      "updates": [
+        {
+          "target": "stale_count",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": 0
+            }
+          ]
+        },
+        {
+          "target": "status",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "healthy"
+            }
+          ]
+        },
+        {
+          "target": "total_findings",
+          "reducer": "builtin/add@1",
+          "args": [
+            {
+              "ref": "$output.new_findings_count"
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "writer",
+        "inputs": {
+          "iteration": {
+            "ref": "$state.iteration"
+          },
+          "phase": {
+            "ref": "$state.phase"
+          },
+          "status": {
+            "literal": "healthy"
+          },
+          "stale_count": {
+            "literal": 0
+          },
+          "total_findings": {
+            "ref": "$state.total_findings"
+          },
+          "gate_passed": {
+            "ref": "$output.gate_passed"
+          },
+          "direction_summary": {
+            "ref": "$output.direction_summary"
+          },
+          "findings_summary": {
+            "ref": "$output.findings_summary"
+          },
+          "route_hint": {
+            "literal": "healthy_continue"
+          },
+          "new_findings_count": {
+            "ref": "$output.new_findings_count"
+          },
+          "trend": {
+            "ref": "$output.trend"
+          },
+          "code_revision": {
+            "ref": "$output.code_revision"
+          },
+          "dataset_revision": {
+            "ref": "$output.dataset_revision"
+          }
+        }
+      }
+    },
+    {
+      "id": "writer_done",
+      "from": "writer",
+      "on": "success",
+      "when": "$state.status == 'completed'",
+      "priority": 210,
+      "to": {
+        "node": "done",
+        "inputs": {
+          "result": {
+            "ref": "$output"
+          }
+        }
+      }
+    },
+    {
+      "id": "writer_attention",
+      "from": "writer",
+      "on": "success",
+      "when": "$state.status == 'attention_required'",
+      "priority": 200,
+      "to": {
+        "node": "attention",
+        "inputs": {
+          "result": {
+            "ref": "$output"
+          }
+        }
+      }
+    },
+    {
+      "id": "writer_error",
+      "from": "writer",
+      "on": "success",
+      "when": "$state.status == 'error'",
+      "priority": 190,
+      "to": {
+        "node": "failed",
+        "inputs": {
+          "error": {
+            "ref": "$output"
+          }
+        }
+      }
+    },
+    {
+      "id": "writer_continue",
+      "from": "writer",
+      "on": "success",
+      "default": true,
+      "to": {
+        "node": "research",
+        "inputs": {
+          "iteration": {
+            "ref": "$state.iteration"
+          },
+          "phase": {
+            "ref": "$state.phase"
+          },
+          "status": {
+            "ref": "$state.status"
+          },
+          "stale_count": {
+            "ref": "$state.stale_count"
+          },
+          "total_findings": {
+            "ref": "$state.total_findings"
+          },
+          "bootstrapped": {
+            "ref": "$state.bootstrapped"
+          }
+        }
+      }
+    },
+    {
+      "id": "research_failed",
+      "from": "research",
+      "on": "failure",
+      "to": {
+        "node": "failed",
+        "inputs": {
+          "error": {
+            "ref": "$output"
+          }
+        }
+      }
+    },
+    {
+      "id": "writer_failed",
+      "from": "writer",
+      "on": "failure",
+      "to": {
+        "node": "failed",
+        "inputs": {
+          "error": {
+            "ref": "$output"
+          }
+        }
+      }
+    },
+    {
+      "id": "research_exhausted",
+      "from": "research",
+      "on": "exhausted",
+      "to": {
+        "node": "exhausted",
+        "inputs": {
+          "result": {
+            "literal": "research agent exhausted budget"
+          }
+        }
+      }
+    },
+    {
+      "id": "writer_exhausted",
+      "from": "writer",
+      "on": "exhausted",
+      "to": {
+        "node": "exhausted",
+        "inputs": {
+          "result": {
+            "literal": "writer agent exhausted budget"
+          }
+        }
+      }
+    }
+  ],
+  "entrypoints": [
+    {
+      "id": "start",
+      "node": "research",
+      "inputs": {
+        "iteration": {
+          "ref": "$state.iteration"
+        },
+        "phase": {
+          "ref": "$state.phase"
+        },
+        "status": {
+          "ref": "$state.status"
+        },
+        "stale_count": {
+          "ref": "$state.stale_count"
+        },
+        "total_findings": {
+          "ref": "$state.total_findings"
+        },
+        "bootstrapped": {
+          "ref": "$state.bootstrapped"
+        }
+      }
+    }
+  ],
+  "limits": {
+    "maxTotalActivations": 200,
+    "maxLiveActivations": 2,
+    "maxWallTimeMs": 172800000,
+    "maxCostUsd": 200,
+    "maxFanOut": 4,
+    "maxPendingTimers": 8
+  },
+  "concurrency": {
+    "maxActivations": 1,
+    "maxPerNode": 1,
+    "stateConsistency": "commit_latest"
+  },
+  "annotations": {
+    "phases": [
+      "amp_conversion",
+      "motion_retargeting",
+      "amp_training",
+      "completed"
+    ],
+    "gates": {
+      "amp_conversion": "Gate A",
+      "motion_retargeting": "Gate B",
+      "amp_training": "Gate C"
+    },
+    "stale_thresholds": {
+      "pivot": 2,
+      "attention": 4
+    }
+  }
+}

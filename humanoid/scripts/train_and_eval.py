@@ -57,33 +57,33 @@ def evaluate(env, runner, retarget_joints, args, seed):
                                "jp_err", "dof_viol", "contact_l", "contact_r"]}
     dev = env.device
     nsteps = int(EPISODE_LEN_S / dt)
+    # Use the runner's inference policy handle (== play.py pattern): actor_critic
+    # in eval mode, policy = act_inference. Step EXACTLY like play.py: NO
+    # inference_mode wrapper (the gym global inference mode handles it); call
+    # policy(obs.detach()) then env.step(actions.detach()); read via .item().
+    policy = runner.get_inference_policy(device=dev) if hasattr(runner, "get_inference_policy") else runner.alg.actor_critic.act_inference
     for ep in range(EVAL_EPISODES):
-        # The gymtorch extension enables a global inference mode. Run the ENTIRE
-        # episode (reset + all steps + all tensor reads) under ONE sustained
-        # inference_mode so no tensor is created normal-then-updated-inplace.
-        with torch.inference_mode():
-            env.reset_idx(torch.arange(env.num_envs, device=dev))
-            obs = env.get_observations()
-            steps = 0; fell = False
-            bh, pt, ve, jpe, cl, cr = [], [], [], [], [], []
-            viol = 0
-            for _ in range(nsteps):
-                actions = policy.act_inference(obs.detach())
-                obs, _, rew, dones, infos = env.step(actions)
-                steps += 1
-                # read to python floats IMMEDIATELY (inside inference_mode)
-                bh.append(float(env.root_states[0, 2]))
-                q = env.root_states[0, 3:7]
-                pt.append(float(np.degrees(torch.asin(torch.clamp(2*(q[3]*q[1]-q[2]*q[0]), -1, 1)).item())))
-                ve.append(abs(float(env.base_lin_vel[0, 0]) - NOMINAL_VX))
-                f = steps % retarget_joints.shape[0]
-                jpe.append(float(torch.abs(env.dof_pos[0] - torch.as_tensor(retarget_joints[f], device=dev, dtype=torch.float)).mean()))
-                cf = env.contact_forces[:, env.feet_indices, 2]
-                cl.append(float(cf[0, 0] > 5.0)); cr.append(float(cf[0, 1] > 5.0))
-                dof = env.dof_pos[0].cpu().numpy()
-                viol += int(((dof < lims[:, 0]) | (dof > lims[:, 1])).sum())
-                if dones[0]:
-                    fell = True; break
+        env.reset_idx(torch.arange(env.num_envs, device=dev))
+        obs = env.get_observations()
+        steps = 0; fell = False
+        bh, pt, ve, jpe, cl, cr = [], [], [], [], [], []
+        viol = 0
+        for _ in range(nsteps):
+            actions = policy(obs.detach())
+            obs, _, rew, dones, infos = env.step(actions.detach())
+            steps += 1
+            bh.append(env.root_states[0, 2].item())
+            q = env.root_states[0, 3:7]
+            pt.append(float(np.degrees(torch.asin(torch.clamp(2*(q[3]*q[1]-q[2]*q[0]), -1, 1)).item())))
+            ve.append(abs(env.base_lin_vel[0, 0].item() - NOMINAL_VX))
+            f = steps % retarget_joints.shape[0]
+            jpe.append(float(np.abs(env.dof_pos[0].cpu().numpy() - retarget_joints[f]).mean()))
+            cf = env.contact_forces[:, env.feet_indices, 2]
+            cl.append((cf[0, 0] > 5.0).item()); cr.append((cf[0, 1] > 5.0).item())
+            dof = env.dof_pos[0].cpu().numpy()
+            viol += int(((dof < lims[:, 0]) | (dof > lims[:, 1])).sum())
+            if dones[0]:
+                fell = True; break
         metrics["fall"].append(int(fell)); metrics["ep_len"].append(steps)
         metrics["vx_err"].append(float(np.mean(ve))); metrics["base_h"].append(float(np.mean(bh)))
         metrics["pitch"].append(float(np.mean(np.abs(pt)))); metrics["jp_err"].append(float(np.mean(jpe)))
