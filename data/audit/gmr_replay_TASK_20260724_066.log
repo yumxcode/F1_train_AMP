@@ -1,0 +1,28 @@
+[SDK][INFO] 2026-07-24 15:21:11 Start scanning directory: /workspace[SDK][INFO] 2026-07-24 15:21:11 Obtained python dependency environment for training project[SDK][INFO] 2026-07-24 15:21:11 Task(TASK_20260724_066) status updated to: Running , ret:True[SDK][INFO] 2026-07-24 15:21:11 New file detected globally: /workspace/F1_train_AMP/humanoid/algo/amp/__pycache__/motion_lib.cpython-38.pyc=== Gate B GMR retarget validation (numpy-only) ===
+  [PASS] all required keys present :: ['root_translation', 'root_rotation', 'joint_positions', 'foot_contact', 'fps', 'note']
+  [PASS] root_translation shape (N,3) :: (405, 3)
+  [PASS] root_rotation shape (N,4) :: (405, 4)
+  [PASS] joint_positions shape (N,12) :: (405, 12)
+  [PASS] foot_contact shape (N,2) :: (405, 2)
+  [PASS] all values finite
+  [PASS] root quaternions unit-norm :: qnorm range [1.0000,1.0000]
+  [PASS] joint values within X1 limits (tol 0.05) :: out-of-range count=0
+  [PASS] joint continuity (max per-frame delta < 0.3 rad) :: max_delta=0.286
+  [PASS] root forward continuity (< 0.1 m/frame) :: max=0.0174
+  [PASS] double-support fraction reasonable (< 0.6) :: double=0.037
+  [PASS] no prolonged flight (neither-contact < 0.3) :: neither=0.035
+  [PASS] left foot shows gait periodicity :: period=0.042s lag=5
+  [PASS] MotionLib loads clip (non-empty) :: N=336
+  [PASS] MotionLib features finite
+  [PASS] MotionLib resampled to 100Hz :: fps=100.0
+  [PASS] MotionLib joint range ok
+  [PASS] AMP feature range bounded (<1e3) :: max|amp|=196.557
+  [PASS] loop continuity assessed :: first/last frame err=5.757 loopable=False
+  [PASS] IK residual reasonable (< 0.15m) :: mean_residual=0.1241m
+
+=== RESULT: PASS (20/20 checks) ===
+[SDK][INFO] 2026-07-24 15:21:16 New file detected globally: /workspace/F1_train_AMP/data/retarget_gmr/mujoco_replay_report.json[replay_gmr] MJCF joints=13, mapped 12/12 X1 dofs
+[replay_gmr] base_h mean=0.700 min=0.673 max=0.725
+[replay_gmr] max_penetration=0.0000m  max_selfcol_contacts=0
+[replay_gmr] RESULT: PASS
+[SDK][INFO] 2026-07-24 15:21:16 Task(TASK_20260724_066) status updated to: Completed , ret:True

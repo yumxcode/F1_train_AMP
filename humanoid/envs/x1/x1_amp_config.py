@@ -51,7 +51,8 @@ class X1AMPCfgPPO(X1DHStandCfgPPO):
         # Policy transition replay buffer.
         policy_buffer_capacity = 1_000_000
         # Expert motion clips. Real training (amp_training) uses the Gate-B validated
-        # retargeted clip. The synthetic smoke clip remains available for Gate-A smoke.
+        # GMR retargeted clip (https://github.com/Roboparty/GMR methodology).
+        # The synthetic smoke clip remains available for Gate-A smoke.
         expert_clip_paths = [
-            "{LEGGED_GYM_ROOT_DIR}/data/retarget/x1_walk_retargeted.npz",
+            "{LEGGED_GYM_ROOT_DIR}/data/retarget_gmr/x1_walk_retargeted.npz",
         ]
