@@ -1,0 +1,151 @@
+{
+  "method": "GMR (arXiv:2505.02833) methodology: SMPL FK + human-scale optimization + two-stage scipy.least_squares numerical IK (position-only coarse, position+rotation fine) with joint-limit bounds. Self-contained numpy/scipy.",
+  "reference": "https://github.com/Roboparty/GMR",
+  "source": "data/0008_normal_walk4_stageii.npz",
+  "source_sha256": "5152128c89d8c7103c78a536370e49fb085514d5907970f1601c85fcf2a65715",
+  "source_fps": 120.0,
+  "n_frames": 405,
+  "human_scale": {
+    "smpl_thigh_len": 0.32062439083762806,
+    "smpl_shin_len": 0.38,
+    "thigh_scale": 0.9512688638665028,
+    "shin_scale": 0.8026315789473684
+  },
+  "ik_residual_mean_m": {
+    "L": 0.13676819892559025,
+    "R": 0.11143245221592303
+  },
+  "x1_link_lengths": {
+    "thigh": 0.305,
+    "shin": 0.305
+  },
+  "n_clip_violations": 0,
+  "finite_ok": true,
+  "range_ok": true,
+  "forward_velocity_mps": 1.6060766609112003,
+  "root_height_mean": 0.7,
+  "root_height_std": 0.01641416715857126,
+  "joint_stats": {
+    "left_hip_pitch_joint": {
+      "min": -0.2409727734055412,
+      "max": -0.012407015774635568,
+      "mean": -0.1283656936583168,
+      "std": 0.05808091029451912,
+      "limit": [
+        -0.9,
+        0.7
+      ]
+    },
+    "left_hip_roll_joint": {
+      "min": -0.35,
+      "max": 0.14377607581666516,
+      "mean": -0.22147119732471302,
+      "std": 0.1657809602474779,
+      "limit": [
+        -0.35,
+        0.35
+      ]
+    },
+    "left_hip_yaw_joint": {
+      "min": -0.4499999999999999,
+      "max": -0.27,
+      "mean": -0.4486666666666585,
+      "std": 0.014079141387961137,
+      "limit": [
+        -0.45,
+        0.45
+      ]
+    },
+    "left_knee_pitch_joint": {
+      "min": 6.037296781667339e-23,
+      "max": 6.022047998953906e-12,
+      "mean": 2.419844106403363e-13,
+      "std": 6.432328843527819e-13,
+      "limit": [
+        0.0,
+        1.45
+      ]
+    },
+    "left_ankle_pitch_joint": {
+      "min": -0.5499999999999999,
+      "max": -0.3299999999999992,
+      "mean": -0.5483703703703702,
+      "std": 0.017207839474175708,
+      "limit": [
+        -0.55,
+        0.45
+      ]
+    },
+    "left_ankle_roll_joint": {
+      "min": -0.29999999999999993,
+      "max": -0.17999999999999997,
+      "mean": -0.299111111111111,
+      "std": 0.009386094258641274,
+      "limit": [
+        -0.3,
+        0.3
+      ]
+    },
+    "right_hip_pitch_joint": {
+      "min": -0.7737027875608324,
+      "max": 0.0018798900359612838,
+      "mean": -0.19391523723021648,
+      "std": 0.14577619613229034,
+      "limit": [
+        -0.9,
+        0.7
+      ]
+    },
+    "right_hip_roll_joint": {
+      "min": -0.35,
+      "max": 0.35,
+      "mean": -0.11077707600633561,
+      "std": 0.2505119021411412,
+      "limit": [
+        -0.35,
+        0.35
+      ]
+    },
+    "right_hip_yaw_joint": {
+      "min": -0.4499999999999999,
+      "max": 0.3149061478607408,
+      "mean": -0.3903096130445241,
+      "std": 0.17414446135248338,
+      "limit": [
+        -0.45,
+        0.45
+      ]
+    },
+    "right_knee_pitch_joint": {
+      "min": 4.605727654901469e-19,
+      "max": 1.4103186931640372,
+      "mean": 0.10993557175113544,
+      "std": 0.32558439566654035,
+      "limit": [
+        0.0,
+        1.45
+      ]
+    },
+    "right_ankle_pitch_joint": {
+      "min": -0.5499999999999999,
+      "max": -0.32999999999999996,
+      "mean": -0.5483703703703702,
+      "std": 0.017207839474175673,
+      "limit": [
+        -0.55,
+        0.45
+      ]
+    },
+    "right_ankle_roll_joint": {
+      "min": -0.29999999999999993,
+      "max": -0.17999999999999997,
+      "mean": -0.299111111111111,
+      "std": 0.009386094258641274,
+      "limit": [
+        -0.3,
+        0.3
+      ]
+    }
+  },
+  "output": "data/retarget_gmr/x1_walk_retargeted.npz"
+}

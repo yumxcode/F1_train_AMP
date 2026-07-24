@@ -1,0 +1,118 @@
+{
+  "method": "GMR (arXiv:2505.02833) methodology: SMPL FK + human-scale optimization + two-stage scipy.least_squares numerical IK (position-only coarse, position+rotation fine) with joint-limit bounds. Self-contained numpy/scipy.",
+  "reference": "https://github.com/Roboparty/GMR",
+  "source_motion": {
+    "path": "data/0008_normal_walk4_stageii.npz",
+    "sha256": "5152128c89d8c7103c78a536370e49fb085514d5907970f1601c85fcf2a65715",
+    "fps": 120.0,
+    "n_frames": 405,
+    "format": "SMPL-X npz (root_orient, pose_body, trans, betas)",
+    "license_source": "BMLrub (BiomotionLab) via /Users/yumx/code/robot_x/X1/Retargeting_X1/BMLrub_stageii"
+  },
+  "f1_model": {
+    "robot": "AgiBot X1 (12-DOF legs-only)",
+    "urdf": "resources/robots/x1/urdf/x1.urdf",
+    "joint_order": [
+      "left_hip_pitch_joint",
+      "left_hip_roll_joint",
+      "left_hip_yaw_joint",
+      "left_knee_pitch_joint",
+      "left_ankle_pitch_joint",
+      "left_ankle_roll_joint",
+      "right_hip_pitch_joint",
+      "right_hip_roll_joint",
+      "right_hip_yaw_joint",
+      "right_knee_pitch_joint",
+      "right_ankle_pitch_joint",
+      "right_ankle_roll_joint"
+    ],
+    "default_dof_pos": [
+      0.4,
+      0.05,
+      -0.31,
+      0.49,
+      -0.21,
+      0.0,
+      -0.4,
+      -0.05,
+      0.31,
+      0.49,
+      -0.21,
+      0.0
+    ],
+    "joint_limits": [
+      [
+        -0.9,
+        0.7
+      ],
+      [
+        -0.35,
+        0.35
+      ],
+      [
+        -0.45,
+        0.45
+      ],
+      [
+        0.0,
+        1.45
+      ],
+      [
+        -0.55,
+        0.45
+      ],
+      [
+        -0.3,
+        0.3
+      ],
+      [
+        -0.9,
+        0.7
+      ],
+      [
+        -0.35,
+        0.35
+      ],
+      [
+        -0.45,
+        0.45
+      ],
+      [
+        0.0,
+        1.45
+      ],
+      [
+        -0.55,
+        0.45
+      ],
+      [
+        -0.3,
+        0.3
+      ]
+    ]
+  },
+  "coordinate_system": {
+    "up_axis": "Z (X1 sim up-axis index 1)",
+    "root_translation": "world meters, X1 Z-up (X=forward, Y=left, Z=up)",
+    "root_rotation": "xyzw quaternion, heading yaw only",
+    "joint_angles": "radians, X1 URDF dof_names order",
+    "fps": "resampled by MotionLib to 100 Hz (policy dt)"
+  },
+  "human_scale": {
+    "smpl_thigh_len": 0.32062439083762806,
+    "smpl_shin_len": 0.38,
+    "thigh_scale": 0.9512688638665028,
+    "shin_scale": 0.8026315789473684
+  },
+  "ik_residual_mean_m": {
+    "L": 0.13676819892559025,
+    "R": 0.11143245221592303
+  },
+  "output_files": {
+    "training_data": "data/retarget_gmr/x1_walk_retargeted.npz",
+    "report": "data/retarget_gmr/retarget_report.json",
+    "manifest": "data/retarget_gmr/retarget_manifest.json"
+  },
+  "validation": "Run validate_retarget_gmr.py (schema/finite/range/continuity/contact/MotionLib round-trip)",
+  "reproducibility": "Deterministic: same source npz + same code revision => same output"
+}
