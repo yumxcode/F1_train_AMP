@@ -49,7 +49,15 @@ def train_phase(args, name, max_iter):
 
 
 def evaluate(env, runner, retarget_joints, args, seed):
-    """Run eval episodes for one seed; return dict of metric arrays."""
+    """Run eval episodes for one seed; return dict of metric arrays.
+
+    The gym global InferenceMode (enabled by IsaacGym) makes env.reset_idx ->
+    randomize_dof_props -> inplace tensor updates raise
+    "Inplace update to inference tensor outside InferenceMode". We disable
+    domain randomization for eval (fixed eval = nominal dynamics) AND wrap the
+    whole episode in torch.inference_mode(False) so the inplace updates during
+    reset/step are legal. This is the documented fix for PyTorch>=2.x + gym.
+    """
     policy = runner.alg.actor_critic
     dt = env.cfg.control.decimation * env.cfg.sim.dt
     lims = np.array([[l, h] for l, h in X1_JOINT_LIMITS])
@@ -57,33 +65,45 @@ def evaluate(env, runner, retarget_joints, args, seed):
                                "jp_err", "dof_viol", "contact_l", "contact_r"]}
     dev = env.device
     nsteps = int(EPISODE_LEN_S / dt)
-    # Use the runner's inference policy handle (== play.py pattern): actor_critic
-    # in eval mode, policy = act_inference. Step EXACTLY like play.py: NO
-    # inference_mode wrapper (the gym global inference mode handles it); call
-    # policy(obs.detach()) then env.step(actions.detach()); read via .item().
+    # Disable domain randomization for the fixed eval (nominal dynamics for a
+    # fair, reproducible comparison; DR is a training-time robustness tool).
+    # We set the flags on the env config so reset_idx's randomize_* are no-ops.
+    for attr in ["randomize_friction", "randomize_base_mass", "randomize_com",
+                 "randomize_gains", "randomize_torque", "randomize_link_mass",
+                 "randomize_motor_offset", "randomize_joint_friction",
+                 "randomize_joint_damping", "randomize_joint_armature",
+                 "randomize_coulomb_friction", "add_lag", "add_dof_lag",
+                 "add_imu_lag", "push_robots"]:
+        if hasattr(env.cfg.domain_rand, attr):
+            setattr(env.cfg.domain_rand, attr, False)
+    env.cfg.noise.add_noise = False  # eval without sensor noise for fixed comparison
+
     policy = runner.get_inference_policy(device=dev) if hasattr(runner, "get_inference_policy") else runner.alg.actor_critic.act_inference
     for ep in range(EVAL_EPISODES):
-        env.reset_idx(torch.arange(env.num_envs, device=dev))
-        obs = env.get_observations()
-        steps = 0; fell = False
-        bh, pt, ve, jpe, cl, cr = [], [], [], [], [], []
-        viol = 0
-        for _ in range(nsteps):
-            actions = policy(obs.detach())
-            obs, _, rew, dones, infos = env.step(actions.detach())
-            steps += 1
-            bh.append(env.root_states[0, 2].item())
-            q = env.root_states[0, 3:7]
-            pt.append(float(np.degrees(torch.asin(torch.clamp(2*(q[3]*q[1]-q[2]*q[0]), -1, 1)).item())))
-            ve.append(abs(env.base_lin_vel[0, 0].item() - NOMINAL_VX))
-            f = steps % retarget_joints.shape[0]
-            jpe.append(float(np.abs(env.dof_pos[0].cpu().numpy() - retarget_joints[f]).mean()))
-            cf = env.contact_forces[:, env.feet_indices, 2]
-            cl.append((cf[0, 0] > 5.0).item()); cr.append((cf[0, 1] > 5.0).item())
-            dof = env.dof_pos[0].cpu().numpy()
-            viol += int(((dof < lims[:, 0]) | (dof > lims[:, 1])).sum())
-            if dones[0]:
-                fell = True; break
+        # Reset OUTSIDE inference mode so randomize_dof_props inplace updates are legal.
+        # eval results are collected inside this normal-mode block.
+        with torch.inference_mode(False):
+            env.reset_idx(torch.arange(env.num_envs, device=dev))
+            obs = env.get_observations()
+            steps = 0; fell = False
+            bh, pt, ve, jpe, cl, cr = [], [], [], [], [], []
+            viol = 0
+            for _ in range(nsteps):
+                actions = policy(obs.detach())
+                obs, _, rew, dones, infos = env.step(actions.detach())
+                steps += 1
+                bh.append(env.root_states[0, 2].item())
+                q = env.root_states[0, 3:7]
+                pt.append(float(np.degrees(torch.asin(torch.clamp(2*(q[3]*q[1]-q[2]*q[0]), -1, 1)).item())))
+                ve.append(abs(env.base_lin_vel[0, 0].item() - NOMINAL_VX))
+                f = steps % retarget_joints.shape[0]
+                jpe.append(float(np.abs(env.dof_pos[0].cpu().numpy() - retarget_joints[f]).mean()))
+                cf = env.contact_forces[:, env.feet_indices, 2]
+                cl.append((cf[0, 0] > 5.0).item()); cr.append((cf[0, 1] > 5.0).item())
+                dof = env.dof_pos[0].cpu().numpy()
+                viol += int(((dof < lims[:, 0]) | (dof > lims[:, 1])).sum())
+                if dones[0]:
+                    fell = True; break
         metrics["fall"].append(int(fell)); metrics["ep_len"].append(steps)
         metrics["vx_err"].append(float(np.mean(ve))); metrics["base_h"].append(float(np.mean(bh)))
         metrics["pitch"].append(float(np.mean(np.abs(pt)))); metrics["jp_err"].append(float(np.mean(jpe)))
