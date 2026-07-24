@@ -1,0 +1,29 @@
+{
+  "taskBaseInfo": {
+    "taskName": "amp-gateA-ppo-baseline-smoke",
+    "taskDescription": "Plain PPO BASELINE bounded smoke on HEAD e7fdb27 (amp_conversion regression baseline). Runs UNCHANGED x1_dh_stand (DHOnPolicyRunner/DHPPO, NO discriminator, NO style reward) 5 iters x 64 envs; asserts actor_critic params update (finite,nonzero) + ckpt save + resume keys + NO AMP state + play inference. Identical smoke budget to the AMP smoke for comparable AMP-gain reference.",
+    "taskTag": ["amp", "gateA", "ppo-baseline"],
+    "projectId": "PRO_20251113_021",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "goodsId": "ESKU000001",
+    "gpuNum": 1,
+    "taskType": "1",
+    "trainType": "1",
+    "personalDataPath": "/personal"
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "commitId": "e7fdb27299b49a26347ee8fed027fbe68dcfab7d",
+    "mainCodeType": "1",
+    "mainCodeName": "smoke_baseline.py",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/smoke_baseline.py",
+    "mainWorkDir": "F1_train_AMP/humanoid/scripts",
+    "startScript": "gm-run F1_train_AMP/humanoid/scripts/smoke_baseline.py --headless",
+    "isOpen": "1",
+    "pullSubmodules": "1",
+    "checkPointFilePath": "",
+    "runParams": ""
+  }
+}

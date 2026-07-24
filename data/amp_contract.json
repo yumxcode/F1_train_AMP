@@ -57,9 +57,16 @@
     "export": "JIT via scripts/export_policy_dh.py; ONNX via scripts/export_onnx_dh.py (observation/action contract identical to train)"
   },
   "gate_a_evidence": {
-    "smoke_task": "TASK_20260724_051 (jirikix768, project PRO_20251113_021, image BJX00000001/V000124, 1x4090D)",
-    "commit": "b9aba05",
-    "log": "data/audit/smoke_TASK_20260724_051.log",
-    "result": "SMOKE OK; disc_param_mean_delta=3.497e-04 finite=True; ckpt save+resume(disc/EMA match)+play verified; SDK Completed ret:True"
+    "amp_smoke_task": "TASK_20260724_051 (jirikix768, project PRO_20251113_021, image BJX00000001/V000124, 1x4090D)",
+    "amp_smoke_commit": "b9aba05",
+    "amp_smoke_log": "data/audit/smoke_TASK_20260724_051.log",
+    "amp_smoke_result": "SMOKE OK; disc_param_mean_delta=3.497e-04 finite=True; ckpt save+resume(disc/EMA match)+play verified; SDK Completed ret:True",
+    "ppo_baseline_smoke_task": "TASK_20260724_061 (jirikix768, same project/image/GPU)",
+    "ppo_baseline_smoke_commit": "e7fdb27",
+    "ppo_baseline_smoke_log": "data/audit/smoke_baseline_TASK_20260724_061.log",
+    "ppo_baseline_smoke_result": "SMOKE OK; runner=DHOnPolicyRunner (plain PPO, NOT AMP); ppo_param_mean_delta=2.656e-03 finite=True; ckpt save+resume+play; ckpt carries NO disc_state_dict (plain); value_loss 0.0104->0.0011; SDK Completed ret:True",
+    "headless_contract_test": "test_amp_contract.py PASS 21/21 (explicit expert/policy schema auto-comparison: shared builder + shared default dof vec, no NaN/Inf, exact shapes; report data/smoke_expert/contract_test_result.json)",
+    "headless_algo_smoke": "amp_algo_smoke_numpy.py PASS 10/10 (disc updates mean|delta|=4.68e-02, loss 4.354->0.065, acc 0.994, style-reward sign correct: expert 0.988 > fake 0.000, monotonic)",
+    "baseline_preserved": "x1_dh_stand (DHOnPolicyRunner) registered & unchanged; AMP task x1_amp (AMPOnPolicyRunner) independent, not a rename"
   }
 }
