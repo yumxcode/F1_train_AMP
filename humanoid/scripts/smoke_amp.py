@@ -37,6 +37,23 @@ SMOKE_STEPS_PER_ENV = 8
 SMOKE_DISC_BATCH = 256
 
 
+def _ensure_smoke_expert() -> str:
+    """Generate the SYNTHETIC Gate-A smoke expert if it is absent and return its path.
+
+    The AMP config's ``expert_clip_paths`` points at the Gate-B *retargeted* clip
+    (``data/retarget/x1_walk_retargeted.npz``), which only exists after Gate B. To keep
+    the Gate-A bounded smoke self-contained and reproducible on a fresh checkout (where
+    the retargeted clip is absent), the smoke regenerates the deterministic synthetic
+    X1-space clip and points the runner at it. This exercises the full AMP plumbing
+    (MotionLib + expert/policy schema match + discriminator) WITHOUT depending on Gate-B
+    output, which is the correct Gate-A boundary.
+    """
+    from humanoid.scripts.gen_smoke_expert import main as _gen_smoke_expert, OUT_PATH
+    if not os.path.isfile(OUT_PATH):
+        _gen_smoke_expert()
+    return OUT_PATH
+
+
 def smoke(args):
     name = "x1_amp"
     env_cfg, train_cfg = task_registry.get_cfgs(name)
@@ -46,6 +63,8 @@ def smoke(args):
     train_cfg.runner.max_iterations = SMOKE_ITERS
     train_cfg.runner.save_interval = SMOKE_ITERS          # force a save during smoke
     train_cfg.amp.disc_batch_size = SMOKE_DISC_BATCH
+    # Gate-A smoke uses the SYNTHETIC expert (independent of Gate-B retargeted data).
+    train_cfg.amp.expert_clip_paths = [_ensure_smoke_expert()]
 
     env, env_cfg = task_registry.make_env(name=name, args=args, env_cfg=env_cfg)
     runner, train_cfg, log_dir = task_registry.make_alg_runner(
