@@ -97,7 +97,7 @@ def main():
     name = "x1_amp"
     max_iter = int(getattr(args, "max_iterations", 2000) or 2000)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    rj = np.load(os.path.join(_REPO, "data", "retarget", "x1_walk_retargeted.npz"))["joint_positions"]
+    rj = np.load(os.path.join(_REPO, "data", "retarget_gmr", "x1_walk_retargeted.npz"))["joint_positions"]
 
     print(f"[train_eval] training {name} seed={args.seed} max_iter={max_iter} ...")
     env, runner, train_cfg, log_dir = train_phase(args, name, max_iter)

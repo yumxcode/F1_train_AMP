@@ -97,9 +97,9 @@ def main():
     args = get_args()
     name = "x1_amp"
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    # load retarget reference for imitation error
-    rj = np.load(os.path.join(_REPO, "data", "retarget", "x1_walk_retargeted.npz"))["joint_positions"]
-    rf = float(np.load(os.path.join(_REPO, "data", "retarget", "x1_walk_retargeted.npz"))["fps"])
+    # load retarget reference for imitation error (GMR Gate-B validated clip)
+    rj = np.load(os.path.join(_REPO, "data", "retarget_gmr", "x1_walk_retargeted.npz"))["joint_positions"]
+    rf = float(np.load(os.path.join(_REPO, "data", "retarget_gmr", "x1_walk_retargeted.npz"))["fps"])
 
     seed_results = {}
     for seed in EVAL_SEEDS:
