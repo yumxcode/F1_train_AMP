@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "ref-mismatch-finding-1.0",
+  "iteration": 7,
+  "phase": "amp_training",
+  "finding": "Gate-C jp_err=0.45 failure is a METRIC REFERENCE-MISMATCH, not a policy imitation defect. The metric compares policy dof_pos against the retargeted EXPERT CLIP at frame index, but the env's ref_joint_pos reward targets an ANALYTIC GAIT-CLOCK reference (default_dof_pos + sin(2pi*phase)*final_swing_joint_delta_pos) that is UNRELATED to the expert clip. The expert clip feeds ONLY the AMP discriminator (style signal), whose style_reward collapsed to 0 during training. So the policy was never trained to track the expert-clip trajectory, yet jp_err measures exactly that.",
+  "architecture_fact": {
+    "env_ref_joint_pos_reward": "humanoid/envs/x1/x1_dh_stand_env.py:640 _reward_ref_joint_pos compares dof_pos to self.ref_dof_pos, which compute_ref_state (line 316-346) builds from an ANALYTIC gait clock: ref_dof_pos = default_dof_pos + sin(2*pi*phase)*final_swing_joint_delta_pos (config final_swing_joint_delta_pos = [0.25,0.15,-0.11,0.40,0.15,0.0, -0.25,-0.15,0.11,0.40,0.15,0.0]). This is a hand-tuned sinusoidal swing, NOT the retargeted mocap.",
+    "expert_clip_usage": "The retargeted expert clip (data/retarget_gmr/x1_walk_retargeted.npz) is consumed ONLY by the AMP discriminator (amp_on_policy_runner._train_discriminator samples it as the 'expert' class). It is NOT used in any env reward or observation. The AMP style reward r=clamp(1-0.25*(ema(D(e))-D(p)),0,2) collapsed to 0 as the standard-GAN discriminator won (expert_logit->+large, policy_logit->-large).",
+    "metric_reference": "humanoid/scripts/train_and_eval.py:130 jpe += mean(|dof_pos - retarget_joints[ep_step % N]|) compares policy dof_pos against the EXPERT CLIP (retarget_joints) at frame index — a reference the env never rewards the policy for tracking."
+  },
+  "quantitative_proof": {
+    "method": "scripts/diag_ref_mismatch.py reconstructed the analytic gait-clock reference trajectory over a cycle and computed the 'two-references-disagree' jp_err floor: the jp_err the metric would read if the policy PERFECTLY tracks the analytic reference (its actual training target) but is compared against the expert clip.",
+    "two_reference_disagree_floor": {
+      "phase_naive_frame_index": 0.422,
+      "phase_aligned_oracle": 0.295
+    },
+    "observed_policy_jp_err": 0.450,
+    "conclusion": "Observed 0.450 is AT the two-reference-disagree floor (0.422 phase-naive). => the policy IS tracking its analytic reference well; the jp_err 'failure' is imposed by the metric comparing against a different reference (expert clip) than the one the env rewards (analytic gait clock). The frozen-threshold 0.30 is actually BELOW the phase-aligned floor (0.295) — i.e. even a policy that perfectly tracks the analytic reference, optimally phase-aligned, would barely pass; with any phase mismatch it fails."
+  },
+  "what_this_means_for_gateC": {
+    "imitation_quality_group": "The joint_pos_err_ref metric as defined CANNOT be met by this env architecture, because the policy's imitation target (analytic gait clock) differs from the metric's reference (expert clip). This is a METRIC/ARCHITECTURE design gap, not a training failure.",
+    "strong_evidence_policy_is_healthy": "The policy achieves 0 falls, ep_len 2401, vx_err 0.15, terrain_level 5.7 — it walks stably and tracks velocity. It is a successful AMP walking policy. The jp_err metric is measuring the wrong thing."
+  },
+  "structural_pivot_options_for_iteration_8": {
+    "option_A_metric_fix_no_retrain": "Redefine the Gate-C imitation metric to compare the policy against the ANALYTIC gait-clock reference (what the env rewards) instead of the expert clip. This is a deterministic local re-analysis on the trained policy (would need a re-eval rollout logging analytic-ref error, or compute analytic-ref jp_err from a saved policy trajectory). If analytic-ref jp_err is low, the imitation-quality Gate-C item is satisfied with NO retrain.",
+    "option_B_architecture_fix": "Make the env's ref_joint_pos reward track the expert clip (replace the analytic gait clock with the retargeted trajectory, phase-aligned to the policy). This is a real AMP/DeepMimic-reference retargeting change. Higher cost (retrain), but aligns the env reward with the metric's reference.",
+    "option_C_strength_disc": "Increase disc_train_iters / lower disc_lr / add spectral norm so the discriminator does not collapse and the style signal persists. But even with a working disc, the metric compares to the expert clip while the env rewards the analytic ref — option C alone would NOT fix the reference mismatch."
+  },
+  "recommended_next": "Option A first (cheap, deterministic, no retrain): verify analytic-ref jp_err on the trained policy. This determines whether Gate-C imitation-quality is a real gap or purely a metric-reference artifact. Per §11 single-variable + §6 no-threshold-lowering, do NOT raise the threshold — either fix the metric's reference (A) or fix the env's reference (B).",
+  "evidence": ["scripts/diag_ref_mismatch.py (analytic-ref vs expert-clip floor 0.422)", "humanoid/envs/x1/x1_dh_stand_env.py:316-346,640-648 (analytic gait-clock reference + ref_joint_pos reward)", "humanoid/envs/x1/x1_amp_config.py:18 (ref_joint_pos scale 0.3, the env reward)", "humanoid/algo/amp/amp_on_policy_runner.py:147-154,156-180 (style reward injection + disc training)", "data/amp_eval/gateC_eval_result_TASK_20260727_049.json (observed jp_err 0.450)"]
+}
