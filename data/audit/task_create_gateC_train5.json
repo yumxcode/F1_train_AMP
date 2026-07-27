@@ -1,0 +1,29 @@
+{
+  "taskBaseInfo": {
+    "taskName": "gateC-amp-train-eval-run5-analytic-ref-metric",
+    "taskDescription": "Gate-C train+5-seed eval with AUGMENTED metrics to test the iter-7 reference-mismatch finding. Harness now additionally reports jp_err(analytic)=policy vs env.ref_dof_pos (the analytic gait-clock the ref_joint_pos reward targets), alongside jp_err(expert)=policy vs retargeted clip (original metric), plus lateral_drift and yaw_drift. Hypothesis: jp_err(analytic) is much lower than jp_err(expert)=0.45 and near/below 0.30, confirming the policy tracks its true target. Trains x1_amp 2000 iters seed5 4096 envs fixed Gate-B expert sha256 a115209b, then 5-seed eval 5/17/42/123/2024 vx=0.5. HEAD cd68a75. Single-variable change vs TASK_049 = EVAL METRICS ONLY.",
+    "taskTag": ["gateC", "amp-training", "eval", "analytic-ref-metric"],
+    "projectId": "PRO_20251113_021",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "goodsId": "ESKU000001",
+    "gpuNum": 1,
+    "taskType": "1",
+    "trainType": "1",
+    "personalDataPath": "/personal"
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "commitId": "cd68a75",
+    "mainCodeType": "1",
+    "mainCodeName": "train_and_eval.py",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/train_and_eval.py",
+    "mainWorkDir": "F1_train_AMP/humanoid/scripts",
+    "startScript": "gm-run F1_train_AMP/humanoid/scripts/train_and_eval.py --task=x1_amp --headless --seed=5 --num_envs=4096 --max_iterations=2000",
+    "isOpen": "1",
+    "pullSubmodules": "1",
+    "checkPointFilePath": "",
+    "runParams": ""
+  }
+}
