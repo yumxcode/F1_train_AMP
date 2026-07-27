@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "account-rotation-recovery-iter10-2.json",
+  "iteration": 10,
+  "phase": "amp_training",
+  "finding": "Resolved the zero-output mystery: it was a TRANSIENT infra/budget issue, NOT a code bug. Diagnostic smoke TASK_20260727_053 ran PERFECTLY (Completed, 145 chart keys, SMOKE OK) on the same commit cd68a75 + same account jirikix768. Retry TASK_20260727_054 then trained HEALTHILY to iter 1133/2000 (tracking_lin_vel 1.15, ep_len 2090) before being terminated (taskStatus=6, runtime 1926s, no error/OOM in logs) => GPU-budget exhaustion. Rotated account per §10 and relaunched.",
+  "isolation_evidence": {
+    "diagnostic_smoke_TASK_053": "Completed ret:True on commit cd68a75 + account jirikix768; 145 chart keys; [smoke_amp] SMOKE OK; model_0+model_5 uploaded. => platform/account/code-at-startup HEALTHY.",
+    "code_diff_d2cfd3f_cd68a75": "All train_and_eval.py changes are inside evaluate() (lines 94-185) or post-training report code (line 210+); NONE affect task startup or training. So the harness change cannot cause the zero-output.",
+    "retry_TASK_054": "Trained HEALTHILY to iter 1133/2000 (tracking_lin_vel 1.15, ep_len 2090, normal) then terminated taskStatus=6 runtime 1926s with no error/OOM/budget message in logs. => mid-run termination = GPU-budget exhaustion, not a crash. The 4096-env x1_amp run (~0.15 GPU-hr/min) drains the account fast."
+  },
+  "recovery": {
+    "per_section_10": "balance insufficient (jirikix768 drained across TASK_049/054/053) -> account-pool remove 13 -> account-pool get (wiwil80375 id14)",
+    "rotation_chain": "jirikix768 (id13, REMOVED) -> wiwil80375 (id14)",
+    "relaunched_task": "TASK_20260727_058",
+    "relaunched_account": "wiwil80375@diarshop.com",
+    "commit": "cd68a75",
+    "status_at_relaunch": "queued awaiting GPU",
+    "protocol_note": "rotation is an ops event, does not change the research conclusion"
+  },
+  "research_state": {
+    "iter7_finding_stands": "jp_err(expert)~0.45 = metric reference-mismatch (env rewards analytic gait-clock ref; metric compares vs expert clip); two-reference-disagree floor 0.422.",
+    "analytic_ref_test_pending": "Option A (jp_err(analytic) vs jp_err(expert)) will resolve on TASK_058 once it completes 2000/2000 + 5-seed eval.",
+    "TASK_049_3seeds": "seed5 jp_err 0.450, seed17 0.449, seed42 0.451 (confirm jp_err(expert)~0.45)."
+  },
+  "next_iteration": "Poll TASK_20260727_058: (1) confirm it trains healthily past iter 1133 (the point TASK_054 was budget-killed); (2) await 2000/2000 + 5-seed eval; (3) extract jp_err(analytic) vs jp_err(expert) + lateral/yaw drift + dof_viol; (4) DECISION: if jp_err(analytic)<=0.30 -> imitation-quality Gate-C item satisfied against policy's true target. If TASK_058 ALSO budget-dies before 2000, escalate: the run is too expensive for single-account budget; consider reducing max_iterations OR running train and eval as separate cheaper tasks.",
+  "budget_risk_note": "A full 2000-iter x1_amp train (4096 envs) + 5-seed eval may exceed a single account's budget (TASK_054 died at iter 1133). If TASK_058 also dies, the recovery path is to REDUCE max_iterations (e.g. 1500) or split train/eval into separate cheaper tasks, NOT to keep blindly rotating accounts (bounded retry per §10)."
+}

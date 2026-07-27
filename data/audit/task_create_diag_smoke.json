@@ -1,0 +1,29 @@
+{
+  "taskBaseInfo": {
+    "taskName": "diag-smoke-platform-health-iter10",
+    "taskDescription": "Cheap diagnostic: run proven Gate-A smoke_amp.py to isolate whether the Gradmotion platform produces output for ANY new task (vs a train_and_eval task-structure issue). Smoke = full AMP closed loop 5 iters x 64 envs, asserts disc updates + ckpt + play.",
+    "taskTag": ["diag", "platform-health"],
+    "projectId": "PRO_20251113_021",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "goodsId": "ESKU000001",
+    "gpuNum": 1,
+    "taskType": "1",
+    "trainType": "1",
+    "personalDataPath": "/personal"
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "commitId": "cd68a75",
+    "mainCodeType": "1",
+    "mainCodeName": "smoke_amp.py",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/smoke_amp.py",
+    "mainWorkDir": "F1_train_AMP/humanoid/scripts",
+    "startScript": "gm-run F1_train_AMP/humanoid/scripts/smoke_amp.py --headless",
+    "isOpen": "1",
+    "pullSubmodules": "1",
+    "checkPointFilePath": "",
+    "runParams": ""
+  }
+}
