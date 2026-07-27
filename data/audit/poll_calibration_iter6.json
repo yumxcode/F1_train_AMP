@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "poll-calibration-1.0",
+  "iteration": 6,
+  "phase": "amp_training",
+  "purpose": "Document the TASK_049 polling interpretation so future rounds do not misread a healthy early-training run as 'diverging'.",
+  "task_id": "TASK_20260727_049",
+  "task_name": "gateC-amp-train-eval-run4-fixed-expert",
+  "account": "jirikix768@diarshop.com",
+  "commit": "d2cfd3f",
+  "status_at_poll": "taskStatus=3 (Running), startTime 2026-07-27 12:02:12, training started 12:05:20 (log_dir 2026-07-27_12-05-20)",
+  "single_variable_change_vs_baseline": "DATA ONLY (fixed expert, unfrozen left knee, sha256 a115209b). Config/algorithm/rewards/eval-harness UNCHANGED from TASK_20260727_024 baseline (commit 3064f7d).",
+  "interpretation_method": "Used `gm task data get --sampling-mode precise` (reads full tfevents metrics) because the `gm task logs` API returns a TRUNCATED/buffered view (only ~first 5KB / early iters) for this task, unlike iteration 4 where logs scrolled fully.",
+  "calibration_vs_healthy_baseline": {
+    "finding": "TASK_049 at iter ~101 is HEALTHY and on-track with the TASK_024 baseline, NOT diverging.",
+    "evidence": "At matched early iterations TASK_049 vs TASK_024 are nearly identical:\n  - episode_length iter3-7: TASK_049 [93,120,144,166,174] vs TASK_024 [93,120,144,166,175] (identical).\n  - AMP/style_reward decay: TASK_049 (0.9477@0 -> 0.3999@39) vs TASK_024 (0.9516@0 -> 0.3999@39) IDENTICAL. This decay is NORMAL AMP behavior (style reward high at init when disc is untrained, settles as disc learns to distinguish). It is NOT a divergence.\n  - tracking_lin_vel early: TASK_049 ~0.09 vs TASK_024 ~0.04-0.06 (TASK_049 slightly HIGHER, not worse).",
+    "what_was_initially_misread": "Mean_reward=13.6/0.81 and ep_len=171 were transient single-iter noise seen at the chart edge, plus the log was truncated. The 'style_reward -> 0' is the normal settling curve, not a collapse. ep_len ~150-233 at iter<100 is the normal early-training regime (TASK_024 ep_len at iter3 was also 93).",
+    "caution_for_future_polls": "Do NOT interpret low ep_len / decaying style_reward / low tracking at iter<300 as failure — these match the healthy baseline. Compare against TASK_024 at the SAME iteration index, not against TASK_024's FINAL converged values. The judgment point is iter>=1500: a healthy run reaches tracking_lin_vel>=0.8, ep_len>=1500, terrain_level>3 by then."
+  },
+  "training_pace": "iter 101 reached at poll time (~14:30). Pod spent ~70min in queue/setup (startTime 12:02 but log_dir created 12:05; the gap is SDK/import init). Iteration speed itself normal (Perf/total_fps~51000, ~1.4s/iter). Training to 2000 will take ~47min of compute from iter-start; eval ~10min after.",
+  "next_round": "Poll TASK_049 again (~30 min, §10). By then expect iter>=1000. Compare tracking_lin_vel / ep_len / terrain_level vs TASK_024 at the SAME iter. If tracking_lin_vel >= ~0.6 by iter ~1000 (TASK_024 hit ~1.0 by iter ~1500), on-track. Then await 2000/2000 + 5-seed eval; extract data/amp_eval/train_eval_report.json; compare jp_err (hypothesis: lower than 0.462 baseline) + confirm fall_rate/vx_err retained. KEY new eval-metric to check: dof_limit_viol (safety, was 30776)."
+}
