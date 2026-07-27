@@ -16,6 +16,9 @@ class X1AMPCfg(X1DHStandCfg):
         class scales(X1DHStandCfg.rewards.scales):
             tracking_lin_vel = 1.5   # 2.5 -> 1.5 (style reward now contributes)
             ref_joint_pos = 0.3     # 0.6 -> 0.3
+            dof_pos_limits = -30.0  # -10 -> -30 (3x stiffer; iter-14 finding: dof_viol=30776,
+                                    # policy rides limits during swing; stiffer penalty pushes
+                                    # the policy to stay within the conservative X1 range)
 
 
 class X1AMPCfgPPO(X1DHStandCfgPPO):
