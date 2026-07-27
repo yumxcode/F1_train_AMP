@@ -74,6 +74,19 @@ def main():
         oob += int(np.sum((col < lo - 0.05) | (col > hi + 0.05)))
     check("joint values within X1 limits (tol 0.05)", oob == 0, f"out-of-range count={oob}")
 
+    # 3b. NO FROZEN JOINTS + bilateral gait symmetry (catches the IK-collapse defect:
+    #     a degenerate local min can pin a joint at its bound for the whole clip while
+    #     still passing range/continuity checks). Every actuated joint must actually
+    #     move, and the L/R knee (the primary gait joints) must show comparable motion.
+    jr = jp.max(0) - jp.min(0)  # per-joint range over the clip
+    frozen = [i for i in range(12) if jr[i] < 0.05]
+    check("no frozen actuated joints (each joint range > 0.05 rad)", len(frozen) == 0,
+          f"frozen joints={[f'{i}:{jr[i]:.3f}' for i in frozen]}" if frozen else "all 12 joints move")
+    lk, rk = jr[3], jr[9]  # L/R knee_pitch
+    knee_sym = min(lk, rk) / max(lk, rk) > 0.4 if max(lk, rk) > 0 else False
+    check("bilateral knee symmetry (L/R knee range ratio > 0.4)",
+          knee_sym, f"L_knee_range={lk:.3f} R_knee_range={rk:.3f} ratio={min(lk,rk)/max(lk,rk):.3f}")
+
     # 4. continuity
     jdelta = np.abs(np.diff(jp, axis=0))
     maxjd = float(jdelta.max())

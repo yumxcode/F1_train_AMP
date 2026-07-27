@@ -188,7 +188,7 @@ def _leg_fk_batch(q6_arr, thigh, shin, side_sign):
 # GMR-style numerical IK per leg
 # --------------------------------------------------------------------------- #
 def solve_leg_ik(target_foot_pos, target_foot_rot, side_sign, default_q6,
-                 thigh=X1_THIGH, shin=X1_SHIN, max_stage=2):
+                 thigh=X1_THIGH, shin=X1_SHIN, max_stage=2, multistart=True):
     """Two-stage numerical IK for one leg (GMR methodology).
 
     Stage 1 (coarse): minimize foot POSITION error only.
@@ -196,7 +196,18 @@ def solve_leg_ik(target_foot_pos, target_foot_rot, side_sign, default_q6,
 
     target_foot_pos: (3,) desired foot position in root-aligned frame.
     target_foot_rot: (3,3) desired foot rotation matrix.
+    default_q6: warm-start seed (previous-frame solution for temporal coherence).
     Returns: 6 joint angles (delta from default in X1 convention).
+
+    BUG FIX (multistart): the original single-seed stage-2 (rotation matching)
+    warm-started from the previous frame; if a prior frame's solution sat at a
+    degenerate local minimum (e.g. knee_pitch pinned at its lower bound 0), the
+    per-frame warm-start propagated it to ALL subsequent frames, freezing that
+    joint for the whole clip (observed: left knee frozen at 0 while the SMPL-X
+    source flexes both knees ~65 deg). Multistart additionally seeds from the
+    neutral default pose and keeps whichever seed yields the lower POSITION
+    residual, escaping such traps while preserving temporal coherence and the
+    GMR rotation-matching stage.
     """
     limits = np.array([
         X1_LIMITS[0], X1_LIMITS[1], X1_LIMITS[2],
@@ -217,25 +228,37 @@ def solve_leg_ik(target_foot_pos, target_foot_rot, side_sign, default_q6,
     lb = limits[:, 0]
     ub = limits[:, 1]
 
-    # Stage 1: position only (coarse)
-    q0 = default_q6.copy()
-    try:
-        res1 = least_squares(residual_pos, q0, bounds=(lb, ub), method="trf",
-                             max_nfev=100, ftol=1e-8)
-        q_best = res1.x
-    except Exception:
-        q_best = q0
-
-    # Stage 2: position + rotation (fine), warm-started from stage 1
-    if max_stage >= 2:
+    def _two_stage(seed):
+        """Run stage1 (pos) -> stage2 (pos+rot) from a given seed; return (q, pos_res)."""
+        q = seed.copy()
         try:
-            res2 = least_squares(residual_pos_rot, q_best, bounds=(lb, ub),
-                                 method="trf", max_nfev=100, ftol=1e-8)
-            q_best = res2.x
+            res1 = least_squares(residual_pos, q, bounds=(lb, ub), method="trf",
+                                 max_nfev=100, ftol=1e-8)
+            q = res1.x
         except Exception:
             pass
+        if max_stage >= 2:
+            try:
+                res2 = least_squares(residual_pos_rot, q, bounds=(lb, ub),
+                                     method="trf", max_nfev=100, ftol=1e-8)
+                q = res2.x
+            except Exception:
+                pass
+        q = np.clip(q, lb, ub)
+        fp, _, _ = _leg_fk(q, thigh, shin, side_sign)
+        pos_res = float(np.linalg.norm(fp - target_foot_pos))
+        return q, pos_res
 
-    return np.clip(q_best, lb, ub)
+    seeds = [default_q6.copy()]
+    if multistart:
+        # neutral default seed = the canonical X1 stand pose (escapes per-frame traps)
+        seeds.append(X1_DEFAULT[:6].copy() if side_sign > 0 else X1_DEFAULT[6:12].copy())
+    best_q, best_res = None, np.inf
+    for seed in seeds:
+        q, res = _two_stage(seed)
+        if res < best_res:
+            best_q, best_res = q, res
+    return best_q
 
 
 # --------------------------------------------------------------------------- #

@@ -105,8 +105,8 @@
     "shin_scale": 0.8026315789473684
   },
   "ik_residual_mean_m": {
-    "L": 0.13676819892559025,
-    "R": 0.11143245221592303
+    "L": 0.12723188555177983,
+    "R": 0.11126774127658733
   },
   "output_files": {
     "training_data": "data/retarget_gmr/x1_walk_retargeted.npz",

@@ -41,6 +41,16 @@
       "detail": "out-of-range count=0"
     },
     {
+      "name": "no frozen actuated joints (each joint range > 0.05 rad)",
+      "pass": true,
+      "detail": "all 12 joints move"
+    },
+    {
+      "name": "bilateral knee symmetry (L/R knee range ratio > 0.4)",
+      "pass": true,
+      "detail": "L_knee_range=1.238 R_knee_range=1.410 ratio=0.878"
+    },
+    {
       "name": "joint continuity (max per-frame delta < 0.3 rad)",
       "pass": true,
       "detail": "max_delta=0.286"
@@ -98,11 +108,11 @@
     {
       "name": "IK residual reasonable (< 0.15m)",
       "pass": true,
-      "detail": "mean_residual=0.1241m"
+      "detail": "mean_residual=0.1192m"
     }
   ],
   "pass": true,
   "n_frames": 405,
   "loopable": false,
-  "loop_error": 5.757257624441199
+  "loop_error": 5.757257913432636
 }

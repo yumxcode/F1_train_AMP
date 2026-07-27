@@ -1,0 +1,29 @@
+{
+  "taskBaseInfo": {
+    "taskName": "gateC-amp-train-eval-run1",
+    "taskDescription": "Gate-C AMP training + fixed 5-seed eval (combined single gm-run). Trains x1_amp with GMR Gate-B expert clip for 2000 iters (seed=5, 4096 envs), then runs 5-seed fixed eval (seeds 5/17/42/123/2024, 4 eps each, vx=0.5 m/s). Measures fall_rate, vx_track_err, joint_pos_err_ref, base_h, pitch, dof_limit_viol, Sim2Sim export. HEAD 0df1187. Frozen thresholds in data/task_spec.md.",
+    "taskTag": ["gateC", "amp-training", "eval"],
+    "projectId": "PRO_20251113_021",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "goodsId": "ESKU000001",
+    "gpuNum": 1,
+    "taskType": "1",
+    "trainType": "1",
+    "personalDataPath": "/personal"
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "commitId": "0df1187",
+    "mainCodeType": "1",
+    "mainCodeName": "train_and_eval.py",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/train_and_eval.py",
+    "mainWorkDir": "F1_train_AMP/humanoid/scripts",
+    "startScript": "gm-run F1_train_AMP/humanoid/scripts/train_and_eval.py --task=x1_amp --headless --seed=5 --num_envs=4096 --max_iterations=2000",
+    "isOpen": "1",
+    "pullSubmodules": "1",
+    "checkPointFilePath": "",
+    "runParams": ""
+  }
+}
