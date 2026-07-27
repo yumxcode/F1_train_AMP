@@ -1,0 +1,29 @@
+{
+  "taskBaseInfo": {
+    "taskName": "gateC-amp-train-eval-run3-fixed-context",
+    "taskDescription": "Gate-C AMP training + fixed 5-seed eval with CORRECTED autograd context. Root cause of TASK_067/079 eval crash: eval called env.reset_idx manually under torch.inference_mode(False) (exits inference mode) -> illegal inplace update on gym inference tensors. Fix: run eval rollout inside torch.inference_mode() (matches amp_on_policy_runner.py:105 training context), rely on env internal auto-reset, never call reset_idx manually, act_inference policy, fixed vx=0.5. Trains x1_amp 2000 iters (seed=5, 4096 envs, GMR Gate-B expert) then 5-seed eval (5/17/42/123/2024, 4 eps, vx=0.5 m/s nominal dynamics). HEAD 3064f7d. Frozen thresholds in data/task_spec.md.",
+    "taskTag": ["gateC", "amp-training", "eval", "fixed-context"],
+    "projectId": "PRO_20251113_021",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "goodsId": "ESKU000001",
+    "gpuNum": 1,
+    "taskType": "1",
+    "trainType": "1",
+    "personalDataPath": "/personal"
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "commitId": "3064f7d",
+    "mainCodeType": "1",
+    "mainCodeName": "train_and_eval.py",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/train_and_eval.py",
+    "mainWorkDir": "F1_train_AMP/humanoid/scripts",
+    "startScript": "gm-run F1_train_AMP/humanoid/scripts/train_and_eval.py --task=x1_amp --headless --seed=5 --num_envs=4096 --max_iterations=2000",
+    "isOpen": "1",
+    "pullSubmodules": "1",
+    "checkPointFilePath": "",
+    "runParams": ""
+  }
+}

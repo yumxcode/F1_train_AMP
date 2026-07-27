@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "gateC-eval-result-1.0",
+  "iteration": 4,
+  "phase": "amp_training",
+  "task_id": "TASK_20260727_024",
+  "task_name": "gateC-amp-train-eval-run3-fixed-context",
+  "account": "jirikix768@diarshop.com",
+  "account_pool_id": 13,
+  "commit": "3064f7d",
+  "branch": "amp-gateA-smoke",
+  "status": "Completed ret:True (taskStatus=5)",
+  "start_time": "2026-07-27 10:12:08",
+  "end_time": "2026-07-27 11:38:48",
+  "log_dir_remote": "/workspace/F1_train_AMP/logs/x1_amp/exported_data/2026-07-27_10-14-54",
+  "checkpoint": "model_2000.pt (uploaded to policUrl)",
+  "landmark": "FIRST Gate-C fixed 5-seed eval to complete end-to-end. The prior inference_mode(False) harness crashed at 'evaluating seed=5' on TASK_067 and TASK_079; the inference_mode() fix (commit 3064f7d) cleared the crash and the full eval ran.",
+  "training_final_metrics": {
+    "iter": "1999/2000",
+    "total_timesteps": 196608000,
+    "total_time_s": 2942,
+    "tracking_lin_vel": 1.1078,
+    "tracking_ang_vel": "healthy",
+    "mean_reward": 63.71,
+    "mean_episode_length": 2044.10,
+    "terrain_level": 6.0952,
+    "feet_clearance": 1.3511,
+    "foot_slip_pen": -0.2647,
+    "dof_pos_limits_pen": -0.1854,
+    "value_loss": 0.0206
+  },
+  "eval_per_seed": {
+    "seed5": {"falls": "0/4", "mean_ep_len": 2401, "vx_err": 0.144, "jp_err": 0.462},
+    "seed17": {"falls": "0/4", "mean_ep_len": 2401, "vx_err": 0.159, "jp_err": 0.462},
+    "seed42": {"falls": "0/4", "mean_ep_len": 2401, "vx_err": 0.154, "jp_err": 0.461},
+    "seed123": {"falls": "0/4", "mean_ep_len": 2401, "vx_err": 0.149, "jp_err": 0.462},
+    "seed2024": {"falls": "0/4", "mean_ep_len": 2401, "vx_err": 0.156, "jp_err": 0.461}
+  },
+  "eval_aggregate_mean": {
+    "seeds_completed": "5/5",
+    "fall_rate": 0.000,
+    "episode_length_steps": 2401,
+    "vx_track_err_mps": 0.152,
+    "base_height_m": 0.576,
+    "joint_pos_err_ref_rad": 0.462,
+    "dof_limit_viol_total": 30776
+  },
+  "gateC_threshold_comparison": {
+    "fall_rate": {"threshold": "<=0.05", "value": 0.000, "pass": true},
+    "episode_length_steps": {"threshold": ">=2000", "value": 2401, "pass": true},
+    "vx_track_err_mps": {"threshold": "<=0.25", "value": 0.152, "pass": true},
+    "base_height_m": {"threshold": "0.55-0.80", "value": 0.576, "pass": true},
+    "joint_pos_err_ref_rad": {"threshold": "<=0.30", "value": 0.462, "pass": false},
+    "dof_limit_viol_total": {"threshold": "=0", "value": 30776, "pass": false},
+    "Sim2Sim": {"threshold": "exportable + plays in MuJoCo without immediate fall", "value": "NOT RUN", "pass": false},
+    "NaN_Inf": {"threshold": "0", "value": "0 (eval completed cleanly, no Traceback)", "pass": true}
+  },
+  "gateC_verdict": "NOT PASSED. 4 metrics PASS (fall_rate, ep_len, vx_track_err, base_h, no NaN/Inf); 3 metrics FAIL (joint_pos_err_ref 0.462>0.30, dof_limit_viol 30776>0, Sim2Sim not run). The stability/walking-task groups are strong and reproducible across 5 seeds; imitation quality (joint-pos error) and safety (joint-limit violations) do not meet frozen thresholds. Per amp_loop.md §6/§11 no-threshold-lowering rule, Gate C is NOT passed.",
+  "analysis": {
+    "stability_task": "EXCELLENT: 0 falls in 20 episodes (5 seeds x 4), full 24s episodes (2401 steps), tight velocity tracking (vx_err 0.144-0.159 tracking 0.5 m/s). The policy learned stable forward walking -- this is a real AMP walking result, not a standstill.",
+    "imitation_quality_gap": "joint_pos_err_ref=0.462 rad consistently across all 5 seeds (std ~0). The policy walks stably but does NOT closely track the reference clip's joint trajectory. Plausible causes (one-variable-per-experiment per §11): (a) AMP style reward weight too low vs task rewards -> stable-but-not-imitative gait (training tracking_lin_vel reward 1.11 is large, style contribution small); (b) retargeted reference has a systematic offset (IK residual 0.124m) shifted into joint space; (c) jp_err metric compares policy dof_pos against the reference at episode-frame index, but the policy's gait phase is not aligned to the reference phase -> inflated even for a good walker.",
+    "safety_gap": "dof_limit_viol_total=30776 over 20 episodes is large. The env has soft termination on base roll/pitch>1.5 and contact, but NOT on joint-limit hard violations, so the policy can ride the joint limits during swing. The training dof_pos_limits penalty (-0.185) is nonzero every iter. This is a real safety concern for deployment (Sim2Sim/real) even though no fall occurs.",
+    "next_directions_structural": [
+      "Increase AMP style-reward weight / decrease task-reward scale so imitation dominates (single-variable change vs current run); re-eval jp_err.",
+      "Add joint-limit hard termination OR stiffer dof_pos_limits penalty so dof_viol->0 (safety gate item); re-eval dof_viol.",
+      "Re-examine the jp_err metric: phase-align policy gait to reference before comparing (the constant 0.46 across seeds suggests a phase/offset artifact, not random noise)."
+    ]
+  },
+  "report_file_remote": "data/amp_eval/train_eval_report.json (written on remote container; personal-storage download returned 0 files, so the aggregate values are captured here from the task log '[train_eval] wrote ... fall_rate=0.000 vx_err=0.152 jp_err=0.462 base_h=0.576 dof_viol=30776 seeds_completed=5/5')",
+  "evidence_bindings": [
+    "TASK_20260727_024 remote logs: '[train_eval] seed=X done' x5 + '[train_eval] wrote .../train_eval_report.json' + 'Task status updated to: Completed ret:True'",
+    "humanoid/scripts/train_and_eval.py @3064f7d evaluate() (the corrected inference_mode() harness)",
+    "data/task_spec.md (frozen Gate-C thresholds, iteration-3 freeze marker preserved)",
+    "data/audit/gateC_run3_launch.json (launch evidence + root-cause diagnosis of prior crash)"
+  ]
+}
