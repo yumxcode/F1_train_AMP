@@ -109,13 +109,15 @@ def evaluate(env, runner, retarget_joints, seed):
     bh = pt = ve = jpe = jpe_an = lat = yaw = cl = cr = 0.0
     init_x = init_y = None
     viol = 0
-    # hard cap so a degenerate policy cannot hang the run
-    step_cap = (EVAL_EPISODES + 2) * (nfull + 5)
+    # Per-episode step budget: if env[0] does NOT terminate within (2 * nominal episode length),
+    # something is pathological (stuck-but-not-terminated) -> force-count it as a completed episode
+    # so one bad seed cannot hang the whole eval. (Prior runs hung here for hours between seeds.)
+    ep_budget = 2 * nfull + 50
 
     with torch.inference_mode():
         obs = env.get_observations()
         s = 0
-        while episodes_done < EVAL_EPISODES and s < step_cap:
+        while episodes_done < EVAL_EPISODES:
             actions = ac.act_inference(obs.detach())
             # fixed forward command for ALL envs every step (overrides reset resamples)
             env.commands[:, 0] = NOMINAL_VX
@@ -145,15 +147,22 @@ def evaluate(env, runner, retarget_joints, seed):
             if init_y is None:
                 init_x, init_y = rx, ry
             lat += abs(ry - init_y)
-            # yaw from quaternion (rotation about Z): atan2(2(wz+xy), 1-2(y^2+z^2))
-            yaw_rad = np.arctan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz))
-            yaw += abs(float(np.degrees(yaw_rad)))
+            # yaw_drift: use the body-frame yaw ANGULAR VELOCITY (base_ang_vel[2], rad/s) -> deg/s,
+            # NOT the absolute heading. The prior metric accumulated abs(absolute heading) without
+            # wraparound/baseline -> a physically-inconsistent 177deg reading for a policy that
+            # tracks forward velocity well (iter-11 finding: metric defect, not a policy defect).
+            # |ang_vel_yaw| in deg/s is the task_spec 'yaw_drift (deg/s, mean |abs|)' quantity.
+            yaw += abs(float(np.degrees(env.base_ang_vel[0, 2].item())))
             cf = env.contact_forces[:, env.feet_indices, 2]
             cl += float((cf[0, 0] > 5.0).item())
             cr += float((cf[0, 1] > 5.0).item())
             viol += int(((dof0 < lims[:, 0]) | (dof0 > lims[:, 1])).sum())
 
-            if bool(reset_buf[0].item()):
+            # Episode boundary = env reset OR per-episode budget exceeded (anti-hang: a stuck-but-
+            # not-terminated env[0] would otherwise loop forever and stall the whole eval, as seen
+            # when TASK_049/059 hung for hours between seeds). Budget-exceeded counts as a timeout.
+            ep_boundary = bool(reset_buf[0].item()) or (ep_step >= ep_budget)
+            if ep_boundary:
                 if warming:
                     warming = False
                 else:
