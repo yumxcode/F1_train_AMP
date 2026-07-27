@@ -1,0 +1,29 @@
+{
+  "taskBaseInfo": {
+    "taskName": "gateC-amp-train-eval-run7-fixed-metrics",
+    "taskDescription": "Gate-C eval with FIXED metrics (commit 04a2d3b): (1) yaw_drift now uses body-frame yaw angular velocity (deg/s) instead of abs heading accumulation (iter-11 found the old 177deg reading was a metric defect, physically inconsistent with good vx/lateral tracking); (2) per-episode step budget anti-hang so a stuck-but-not-terminated env[0] cannot stall the eval for hours (TASK_049/059 hung between seeds). Reports jp_err(analytic) vs jp_err(expert) + correct yaw_drift + dof_viol + base_pitch/height. max_iterations=1500 budget-safe. Trains x1_amp seed5 4096 envs fixed Gate-B expert.",
+    "taskTag": ["gateC", "eval", "fixed-metrics"],
+    "projectId": "PRO_20251113_021",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "goodsId": "ESKU000001",
+    "gpuNum": 1,
+    "taskType": "1",
+    "trainType": "1",
+    "personalDataPath": "/personal"
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "commitId": "04a2d3b",
+    "mainCodeType": "1",
+    "mainCodeName": "train_and_eval.py",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/train_and_eval.py",
+    "mainWorkDir": "F1_train_AMP/humanoid/scripts",
+    "startScript": "gm-run F1_train_AMP/humanoid/scripts/train_and_eval.py --task=x1_amp --headless --seed=5 --num_envs=4096 --max_iterations=1500",
+    "isOpen": "1",
+    "pullSubmodules": "1",
+    "checkPointFilePath": "",
+    "runParams": ""
+  }
+}
