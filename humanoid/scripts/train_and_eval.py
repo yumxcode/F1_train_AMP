@@ -38,7 +38,7 @@ NOMINAL_VX = 0.5
 
 
 def train_phase(args, name, max_iter):
-    """Train x1_amp and return (runner, train_cfg, log_dir)."""
+    """Train x1_amp and return (env, runner, train_cfg, log_dir)."""
     env_cfg, train_cfg = task_registry.get_cfgs(name)
     train_cfg.runner.max_iterations = max_iter
     env, _ = task_registry.make_env(name=name, args=args, env_cfg=env_cfg)
@@ -48,67 +48,118 @@ def train_phase(args, name, max_iter):
     return env, runner, train_cfg, log_dir
 
 
-def evaluate(env, runner, retarget_joints, args, seed):
-    """Run eval episodes for one seed; return dict of metric arrays.
+def evaluate(env, runner, retarget_joints, seed):
+    """Fixed-seed eval (Gate C). CRITICAL autograd-context fix:
 
-    The gym global InferenceMode (enabled by IsaacGym) makes env.reset_idx ->
-    randomize_dof_props -> inplace tensor updates raise
-    "Inplace update to inference tensor outside InferenceMode". We disable
-    domain randomization for eval (fixed eval = nominal dynamics) AND wrap the
-    whole episode in torch.inference_mode(False) so the inplace updates during
-    reset/step are legal. This is the documented fix for PyTorch>=2.x + gym.
+    ``env.step`` is run inside ``torch.inference_mode()`` -- the SAME context as
+    the training rollout (amp_on_policy_runner.py:105-108). The env's *internal*
+    auto-reset (``post_physics_step -> reset_idx``), which inplace-updates gym
+    inference tensors (``dof_pos[env_ids]=...`` etc.), is therefore LEGAL.
+
+    The prior harness called ``env.reset_idx(...)`` MANUALLY wrapped in
+    ``torch.inference_mode(False)``. ``inference_mode(False)`` EXITS inference
+    mode, so the manual reset's inplace updates were illegal and crashed with
+    "Inplace update to inference tensor outside InferenceMode" -- which is why
+    TASK_20260724_067 and TASK_20260724_079 both terminated right at
+    "evaluating seed=5". We now (a) use ``inference_mode()`` (enter), (b) rely on
+    the env's internal auto-reset, and (c) never call ``reset_idx`` ourselves.
+
+    Episodes are segmented by ``env.reset_buf[0]``; a fall = a reset with
+    ``time_out_buf[0] == False``. Nominal dynamics (DR/noise off, fixed vx=0.5),
+    matching the proven play.py path.
     """
-    policy = runner.alg.actor_critic
-    dt = env.cfg.control.decimation * env.cfg.sim.dt
-    lims = np.array([[l, h] for l, h in X1_JOINT_LIMITS])
-    metrics = {k: [] for k in ["fall", "ep_len", "vx_err", "base_h", "pitch",
-                               "jp_err", "dof_viol", "contact_l", "contact_r"]}
     dev = env.device
-    nsteps = int(EPISODE_LEN_S / dt)
-    # Disable domain randomization for the fixed eval (nominal dynamics for a
-    # fair, reproducible comparison; DR is a training-time robustness tool).
-    # We set the flags on the env config so reset_idx's randomize_* are no-ops.
+    dt = env.cfg.control.decimation * env.cfg.sim.dt
+    lims = np.array([[lo, hi] for lo, hi in X1_JOINT_LIMITS])
+    clip_len = retarget_joints.shape[0]
+
+    # --- nominal-dynamics eval config (mirror play.py) ---
     for attr in ["randomize_friction", "randomize_base_mass", "randomize_com",
                  "randomize_gains", "randomize_torque", "randomize_link_mass",
                  "randomize_motor_offset", "randomize_joint_friction",
                  "randomize_joint_damping", "randomize_joint_armature",
                  "randomize_coulomb_friction", "add_lag", "add_dof_lag",
-                 "add_imu_lag", "push_robots"]:
+                 "add_imu_lag", "add_dof_pos_vel_lag", "push_robots",
+                 "continuous_push", "randomize_lag_timesteps"]:
         if hasattr(env.cfg.domain_rand, attr):
             setattr(env.cfg.domain_rand, attr, False)
-    env.cfg.noise.add_noise = False  # eval without sensor noise for fixed comparison
+    env.cfg.noise.add_noise = False
+    env.cfg.env.send_timeouts = True                      # populates extras["time_outs"]
+    env.max_episode_length = int(round(EPISODE_LEN_S / dt))   # defines a full eval episode
+    env.max_episode_length_s = float(EPISODE_LEN_S)
+    if hasattr(env.cfg.commands, "resampling_time"):
+        env.cfg.commands.resampling_time = 1e9            # keep the fixed command (no auto-resample)
 
-    policy = runner.get_inference_policy(device=dev) if hasattr(runner, "get_inference_policy") else runner.alg.actor_critic.act_inference
-    for ep in range(EVAL_EPISODES):
-        # Reset OUTSIDE inference mode so randomize_dof_props inplace updates are legal.
-        # eval results are collected inside this normal-mode block.
-        with torch.inference_mode(False):
-            env.reset_idx(torch.arange(env.num_envs, device=dev))
-            obs = env.get_observations()
-            steps = 0; fell = False
-            bh, pt, ve, jpe, cl, cr = [], [], [], [], [], []
-            viol = 0
-            for _ in range(nsteps):
-                actions = policy(obs.detach())
-                obs, _, rew, dones, infos = env.step(actions.detach())
-                steps += 1
-                bh.append(env.root_states[0, 2].item())
-                q = env.root_states[0, 3:7]
-                pt.append(float(np.degrees(torch.asin(torch.clamp(2*(q[3]*q[1]-q[2]*q[0]), -1, 1)).item())))
-                ve.append(abs(env.base_lin_vel[0, 0].item() - NOMINAL_VX))
-                f = steps % retarget_joints.shape[0]
-                jpe.append(float(np.abs(env.dof_pos[0].cpu().numpy() - retarget_joints[f]).mean()))
-                cf = env.contact_forces[:, env.feet_indices, 2]
-                cl.append((cf[0, 0] > 5.0).item()); cr.append((cf[0, 1] > 5.0).item())
-                dof = env.dof_pos[0].cpu().numpy()
-                viol += int(((dof < lims[:, 0]) | (dof > lims[:, 1])).sum())
-                if dones[0]:
-                    fell = True; break
-        metrics["fall"].append(int(fell)); metrics["ep_len"].append(steps)
-        metrics["vx_err"].append(float(np.mean(ve))); metrics["base_h"].append(float(np.mean(bh)))
-        metrics["pitch"].append(float(np.mean(np.abs(pt)))); metrics["jp_err"].append(float(np.mean(jpe)))
-        metrics["dof_viol"].append(viol); metrics["contact_l"].append(float(np.mean(cl)))
-        metrics["contact_r"].append(float(np.mean(cr)))
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    ac = runner.alg.actor_critic
+    nfull = int(env.max_episode_length)
+    metrics = {k: [] for k in ["fall", "ep_len", "vx_err", "base_h", "pitch",
+                               "jp_err", "dof_viol", "contact_l", "contact_r"]}
+
+    episodes_done = 0
+    warming = True            # discard the first (warm-up) episode boundary for env[0]
+    ep_step = 0
+    bh = pt = ve = jpe = cl = cr = 0.0
+    viol = 0
+    # hard cap so a degenerate policy cannot hang the run
+    step_cap = (EVAL_EPISODES + 2) * (nfull + 5)
+
+    with torch.inference_mode():
+        obs = env.get_observations()
+        s = 0
+        while episodes_done < EVAL_EPISODES and s < step_cap:
+            actions = ac.act_inference(obs.detach())
+            # fixed forward command for ALL envs every step (overrides reset resamples)
+            env.commands[:, 0] = NOMINAL_VX
+            env.commands[:, 1] = 0.0
+            env.commands[:, 2] = 0.0
+            if env.commands.shape[1] > 3:
+                env.commands[:, 3] = 0.0
+            obs, _, _, reset_buf, extras = env.step(actions)
+            s += 1
+            ep_step += 1
+
+            bh += float(env.root_states[0, 2].item())
+            qw, qx, qy, qz = (env.root_states[0, 3].item(), env.root_states[0, 4].item(),
+                              env.root_states[0, 5].item(), env.root_states[0, 6].item())
+            sin_p = 2.0 * (qz * qx - qy * qw)
+            pt += abs(float(np.degrees(np.arcsin(min(1.0, max(-1.0, sin_p))))))
+            ve += abs(env.base_lin_vel[0, 0].item() - NOMINAL_VX)
+            dof0 = env.dof_pos[0].detach().cpu().numpy()
+            jpe += float(np.abs(dof0 - retarget_joints[ep_step % clip_len]).mean())
+            cf = env.contact_forces[:, env.feet_indices, 2]
+            cl += float((cf[0, 0] > 5.0).item())
+            cr += float((cf[0, 1] > 5.0).item())
+            viol += int(((dof0 < lims[:, 0]) | (dof0 > lims[:, 1])).sum())
+
+            if bool(reset_buf[0].item()):
+                if warming:
+                    warming = False
+                else:
+                    to = extras.get("time_outs")
+                    timed_out = bool(to[0].item()) if to is not None else (ep_step >= nfull)
+                    metrics["fall"].append(int(not timed_out))
+                    metrics["ep_len"].append(ep_step)
+                    metrics["vx_err"].append(ve / max(ep_step, 1))
+                    metrics["base_h"].append(bh / max(ep_step, 1))
+                    metrics["pitch"].append(pt / max(ep_step, 1))
+                    metrics["jp_err"].append(jpe / max(ep_step, 1))
+                    metrics["dof_viol"].append(viol)
+                    metrics["contact_l"].append(cl / max(ep_step, 1))
+                    metrics["contact_r"].append(cr / max(ep_step, 1))
+                    episodes_done += 1
+                ep_step = 0
+                bh = pt = ve = jpe = cl = cr = 0.0
+                viol = 0
+
+    if episodes_done == 0:
+        # degenerate: never crossed an episode boundary (instant fall loop) -> record a hard fall
+        metrics["fall"].append(1)
+        metrics["ep_len"].append(0)
+        for k in ["vx_err", "base_h", "pitch", "jp_err", "contact_l", "contact_r"]:
+            metrics[k].append(0.0)
+        metrics["dof_viol"].append(0)
     return metrics
 
 
@@ -126,33 +177,56 @@ def main():
     # eval across the fixed seed set on the just-trained checkpoint
     all_results = {}
     for eseed in EVAL_SEEDS:
-        print(f"[train_eval] evaluating seed={eseed} ...")
-        all_results[eseed] = evaluate(env, runner, rj, args, eseed)
+        print(f"[train_eval] evaluating seed={eseed} ...", flush=True)
+        try:
+            all_results[eseed] = evaluate(env, runner, rj, eseed)
+            r = all_results[eseed]
+            print(f"[train_eval]   seed={eseed} done: "
+                  f"falls={sum(r['fall'])}/{len(r['fall'])} "
+                  f"mean_ep_len={float(np.mean(r['ep_len'])):.0f} "
+                  f"vx_err={float(np.mean(r['vx_err'])):.3f} "
+                  f"jp_err={float(np.mean(r['jp_err'])):.3f}", flush=True)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            traceback.print_exc()
+            print(f"[train_eval]   seed={eseed} EVAL FAILED: {e}", flush=True)
+            all_results[eseed] = None
 
     def agg(key):
         vals = []
-        for s in EVAL_SEEDS:
-            vals.extend(all_results[s][key])
+        for sd in EVAL_SEEDS:
+            if all_results[sd] is not None:
+                vals.extend(all_results[sd][key])
         vals = np.array(vals, dtype=float)
         hi = "err" in key or "fall" in key or "viol" in key or "pitch" in key
-        return {"mean": float(vals.mean()), "std": float(vals.std()),
-                "worst": float(vals.max() if hi else vals.min())}
+        return {"n": int(vals.size),
+                "mean": float(vals.mean()) if vals.size else float("nan"),
+                "std": float(vals.std()) if vals.size else float("nan"),
+                "worst": float(vals.max() if hi else vals.min()) if vals.size else float("nan")}
 
+    n_ok = sum(1 for sd in EVAL_SEEDS if all_results[sd] is not None)
     report = {
         "task": name, "train_seed": int(args.seed), "train_max_iter": max_iter,
         "eval_seeds": EVAL_SEEDS, "episodes_per_seed": EVAL_EPISODES,
-        "nominal_vx": NOMINAL_VX, "log_dir": log_dir,
+        "nominal_vx": NOMINAL_VX, "episode_len_s": EPISODE_LEN_S,
+        "seeds_completed": n_ok, "seeds_total": len(EVAL_SEEDS),
+        "log_dir": log_dir,
         "fall_rate": agg("fall"), "episode_length_steps": agg("ep_len"),
         "vx_track_err_mps": agg("vx_err"), "base_height_m": agg("base_h"),
         "base_pitch_deg": agg("pitch"), "joint_pos_err_ref_rad": agg("jp_err"),
-        "dof_limit_viol_total": int(sum(sum(all_results[s]["dof_viol"]) for s in EVAL_SEEDS)),
+        "dof_limit_viol_total": int(sum(int(np.sum(all_results[sd]["dof_viol"]))
+                                        for sd in EVAL_SEEDS if all_results[sd] is not None)),
         "foot_contact_l_frac": agg("contact_l"), "foot_contact_r_frac": agg("contact_r"),
     }
     with open(OUT, "w") as f:
         json.dump(report, f, indent=2)
     print(f"[train_eval] wrote {OUT}")
-    print(f"  fall_rate={report['fall_rate']['mean']:.3f} vx_err={report['vx_track_err_mps']['mean']:.3f} "
-          f"jp_err={report['joint_pos_err_ref_rad']['mean']:.3f} base_h={report['base_height_m']['mean']:.3f}")
+    print(f"  seeds_completed={n_ok}/{len(EVAL_SEEDS)} "
+          f"fall_rate={report['fall_rate']['mean']:.3f} "
+          f"vx_err={report['vx_track_err_mps']['mean']:.3f} "
+          f"jp_err={report['joint_pos_err_ref_rad']['mean']:.3f} "
+          f"base_h={report['base_height_m']['mean']:.3f} "
+          f"dof_viol={report['dof_limit_viol_total']}")
     return 0
 
 
