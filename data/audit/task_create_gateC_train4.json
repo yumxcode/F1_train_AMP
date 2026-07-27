@@ -1,0 +1,29 @@
+{
+  "taskBaseInfo": {
+    "taskName": "gateC-amp-train-eval-run4-fixed-expert",
+    "taskDescription": "Gate-C AMP training + fixed 5-seed eval with the FIXED Gate-B expert clip (retarget IK defect resolved). Prior run TASK_20260727_024 used an expert with a frozen LEFT knee (retarget IK bug); this run uses the regenerated clip (multistart IK, L_knee range 1.238, all 12 joints active, sha256=a115209b). Single-variable change vs TASK_024: data only (training config/algorithm/rewards unchanged). Hypothesis: the jp_err imitation-metric failure (0.462>0.30) was dominated by the defective reference's frozen left knee; with a valid bilateral reference jp_err should drop substantially while the strong stability/task metrics (fall_rate=0, vx_err=0.15) are retained. Trains x1_amp 2000 iters (seed=5, 4096 envs) then 5-seed eval (5/17/42/123/2024, 4 eps, vx=0.5 m/s nominal). HEAD d2cfd3f. Frozen thresholds in data/task_spec.md.",
+    "taskTag": ["gateC", "amp-training", "eval", "fixed-expert"],
+    "projectId": "PRO_20251113_021",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "goodsId": "ESKU000001",
+    "gpuNum": 1,
+    "taskType": "1",
+    "trainType": "1",
+    "personalDataPath": "/personal"
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "commitId": "d2cfd3f",
+    "mainCodeType": "1",
+    "mainCodeName": "train_and_eval.py",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/train_and_eval.py",
+    "mainWorkDir": "F1_train_AMP/humanoid/scripts",
+    "startScript": "gm-run F1_train_AMP/humanoid/scripts/train_and_eval.py --task=x1_amp --headless --seed=5 --num_envs=4096 --max_iterations=2000",
+    "isOpen": "1",
+    "pullSubmodules": "1",
+    "checkPointFilePath": "",
+    "runParams": ""
+  }
+}
