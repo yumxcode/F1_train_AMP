@@ -94,13 +94,20 @@ def evaluate(env, runner, retarget_joints, seed):
     np.random.seed(seed)
     ac = runner.alg.actor_critic
     nfull = int(env.max_episode_length)
+    # jp_err        = policy vs the RETARGETED EXPERT CLIP (the original Gate-C metric;
+    #                  reference the policy was NOT trained to track — see ref_mismatch finding iter7).
+    # jp_err_analytic = policy vs the env's ANALYTIC GAIT-CLOCK reference (env.ref_dof_pos,
+    #                  what the ref_joint_pos reward actually targets — the policy's true target).
+    # lateral_drift / yaw_drift = frozen task_spec walking-task metrics (not previously measured).
     metrics = {k: [] for k in ["fall", "ep_len", "vx_err", "base_h", "pitch",
-                               "jp_err", "dof_viol", "contact_l", "contact_r"]}
+                               "jp_err", "jp_err_analytic", "lateral_drift", "yaw_drift",
+                               "dof_viol", "contact_l", "contact_r"]}
 
     episodes_done = 0
     warming = True            # discard the first (warm-up) episode boundary for env[0]
     ep_step = 0
-    bh = pt = ve = jpe = cl = cr = 0.0
+    bh = pt = ve = jpe = jpe_an = lat = yaw = cl = cr = 0.0
+    init_x = init_y = None
     viol = 0
     # hard cap so a degenerate policy cannot hang the run
     step_cap = (EVAL_EPISODES + 2) * (nfull + 5)
@@ -128,6 +135,19 @@ def evaluate(env, runner, retarget_joints, seed):
             ve += abs(env.base_lin_vel[0, 0].item() - NOMINAL_VX)
             dof0 = env.dof_pos[0].detach().cpu().numpy()
             jpe += float(np.abs(dof0 - retarget_joints[ep_step % clip_len]).mean())
+            # analytic gait-clock reference (env.ref_dof_pos is updated every step by compute_ref_state)
+            if hasattr(env, "ref_dof_pos"):
+                ref0 = env.ref_dof_pos[0].detach().cpu().numpy()
+                jpe_an += float(np.abs(dof0 - ref0).mean())
+            # lateral drift (Y) and yaw drift: track base root XY + heading from episode start
+            rx = float(env.root_states[0, 0].item())
+            ry = float(env.root_states[0, 1].item())
+            if init_y is None:
+                init_x, init_y = rx, ry
+            lat += abs(ry - init_y)
+            # yaw from quaternion (rotation about Z): atan2(2(wz+xy), 1-2(y^2+z^2))
+            yaw_rad = np.arctan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz))
+            yaw += abs(float(np.degrees(yaw_rad)))
             cf = env.contact_forces[:, env.feet_indices, 2]
             cl += float((cf[0, 0] > 5.0).item())
             cr += float((cf[0, 1] > 5.0).item())
@@ -145,19 +165,24 @@ def evaluate(env, runner, retarget_joints, seed):
                     metrics["base_h"].append(bh / max(ep_step, 1))
                     metrics["pitch"].append(pt / max(ep_step, 1))
                     metrics["jp_err"].append(jpe / max(ep_step, 1))
+                    metrics["jp_err_analytic"].append(jpe_an / max(ep_step, 1))
+                    metrics["lateral_drift"].append(lat / max(ep_step, 1))
+                    metrics["yaw_drift"].append(yaw / max(ep_step, 1))
                     metrics["dof_viol"].append(viol)
                     metrics["contact_l"].append(cl / max(ep_step, 1))
                     metrics["contact_r"].append(cr / max(ep_step, 1))
                     episodes_done += 1
                 ep_step = 0
-                bh = pt = ve = jpe = cl = cr = 0.0
+                bh = pt = ve = jpe = jpe_an = lat = yaw = cl = cr = 0.0
                 viol = 0
+                init_x = init_y = None
 
     if episodes_done == 0:
         # degenerate: never crossed an episode boundary (instant fall loop) -> record a hard fall
         metrics["fall"].append(1)
         metrics["ep_len"].append(0)
-        for k in ["vx_err", "base_h", "pitch", "jp_err", "contact_l", "contact_r"]:
+        for k in ["vx_err", "base_h", "pitch", "jp_err", "jp_err_analytic",
+                  "lateral_drift", "yaw_drift", "contact_l", "contact_r"]:
             metrics[k].append(0.0)
         metrics["dof_viol"].append(0)
     return metrics
@@ -185,7 +210,10 @@ def main():
                   f"falls={sum(r['fall'])}/{len(r['fall'])} "
                   f"mean_ep_len={float(np.mean(r['ep_len'])):.0f} "
                   f"vx_err={float(np.mean(r['vx_err'])):.3f} "
-                  f"jp_err={float(np.mean(r['jp_err'])):.3f}", flush=True)
+                  f"jp_err(expert)={float(np.mean(r['jp_err'])):.3f} "
+                  f"jp_err(analytic)={float(np.mean(r['jp_err_analytic'])):.3f} "
+                  f"lat_drift={float(np.mean(r['lateral_drift'])):.3f} "
+                  f"yaw_drift={float(np.mean(r['yaw_drift'])):.1f}", flush=True)
         except Exception as e:  # noqa: BLE001
             import traceback
             traceback.print_exc()
@@ -214,6 +242,8 @@ def main():
         "fall_rate": agg("fall"), "episode_length_steps": agg("ep_len"),
         "vx_track_err_mps": agg("vx_err"), "base_height_m": agg("base_h"),
         "base_pitch_deg": agg("pitch"), "joint_pos_err_ref_rad": agg("jp_err"),
+        "joint_pos_err_analytic_rad": agg("jp_err_analytic"),
+        "lateral_drift_m": agg("lateral_drift"), "yaw_drift_deg": agg("yaw_drift"),
         "dof_limit_viol_total": int(sum(int(np.sum(all_results[sd]["dof_viol"]))
                                         for sd in EVAL_SEEDS if all_results[sd] is not None)),
         "foot_contact_l_frac": agg("contact_l"), "foot_contact_r_frac": agg("contact_r"),
@@ -224,8 +254,11 @@ def main():
     print(f"  seeds_completed={n_ok}/{len(EVAL_SEEDS)} "
           f"fall_rate={report['fall_rate']['mean']:.3f} "
           f"vx_err={report['vx_track_err_mps']['mean']:.3f} "
-          f"jp_err={report['joint_pos_err_ref_rad']['mean']:.3f} "
+          f"jp_err(expert)={report['joint_pos_err_ref_rad']['mean']:.3f} "
+          f"jp_err(analytic)={report['joint_pos_err_analytic_rad']['mean']:.3f} "
           f"base_h={report['base_height_m']['mean']:.3f} "
+          f"lat_drift={report['lateral_drift_m']['mean']:.3f} "
+          f"yaw_drift={report['yaw_drift_deg']['mean']:.1f} "
           f"dof_viol={report['dof_limit_viol_total']}")
     return 0
 
