@@ -216,6 +216,18 @@ class LeggedRobot(BaseTask):
         self.reset_buf |= roll_cutoff
         self.reset_buf |= pitch_cutoff
 
+        # Hard joint-limit termination (Gate-C safety): terminate episode if any dof exceeds the
+        # tight X1 limits by more than a small margin (catches significant violations from PD
+        # overshoot while allowing minor numerical overshoots). Gated by cfg.safety flag so the
+        # plain PPO baseline (x1_dh_stand) is unaffected.
+        if getattr(self.cfg.safety, 'terminate_on_joint_limit', False) and hasattr(self, 'dof_pos_limits'):
+            _margin = float(getattr(self.cfg.safety, 'joint_limit_termination_margin', 0.05))
+            joint_limit_exceeded = torch.any(
+                (self.dof_pos < (self.dof_pos_limits[:, 0] - _margin)) |
+                (self.dof_pos > (self.dof_pos_limits[:, 1] + _margin)),
+                dim=1)
+            self.reset_buf |= joint_limit_exceeded
+
     def reset_idx(self, env_ids):
         """ Reset some environments.
             Calls self._reset_dofs(env_ids), self._reset_root_states(env_ids), and self._resample_commands(env_ids)

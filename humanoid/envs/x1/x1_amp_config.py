@@ -10,15 +10,22 @@ class X1AMPCfg(X1DHStandCfg):
     class asset(X1DHStandCfg.asset):
         name = "x1_amp"
 
+    class safety(X1DHStandCfg.safety):
+        # Hard joint-limit termination (Gate-C safety): terminate episode if any dof exceeds the
+        # tight X1 limits by > 0.05 rad margin. Forces the policy to learn zero-violation behavior
+        # to survive, without the soft-penalty safety-vs-performance tradeoff (iter-15 finding).
+        # The plain PPO baseline (x1_dh_stand) inherits safety without this flag -> unaffected.
+        terminate_on_joint_limit = True
+        joint_limit_termination_margin = 0.05
+
     class rewards(X1DHStandCfg.rewards):
         # Keep the task reward (gait/velocity) but down-weight tracking slightly so the
         # style reward (added by the AMP runner) has room to shape the motion.
         class scales(X1DHStandCfg.rewards.scales):
             tracking_lin_vel = 1.5   # 2.5 -> 1.5 (style reward now contributes)
             ref_joint_pos = 0.3     # 0.6 -> 0.3
-            dof_pos_limits = -30.0  # -10 -> -30 (3x stiffer; iter-14 finding: dof_viol=30776,
-                                    # policy rides limits during swing; stiffer penalty pushes
-                                    # the policy to stay within the conservative X1 range)
+            # dof_pos_limits scale stays at -10 (the -30 experiment, iter-15, degraded vx tracking
+            # without sufficiently reducing violations; hard termination handles safety instead)
 
 
 class X1AMPCfgPPO(X1DHStandCfgPPO):
