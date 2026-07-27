@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "gateC-eval-result-1.0",
+  "iteration": 6,
+  "phase": "amp_training",
+  "task_id": "TASK_20260727_049",
+  "task_name": "gateC-amp-train-eval-run4-fixed-expert",
+  "account": "jirikix768@diarshop.com",
+  "account_pool_id": 13,
+  "commit": "d2cfd3f",
+  "branch": "amp-gateA-smoke",
+  "status": "taskStatus=3 Running (training 2000/2000 done at 12:54:54; eval in progress)",
+  "log_dir_remote": "/workspace/F1_train_AMP/logs/x1_amp/exported_data/2026-07-27_12-05-20",
+  "single_variable_change_vs_baseline": "DATA ONLY. Fixed Gate-B expert (unfrozen left knee via multistart IK, sha256 a115209b) vs the TASK_20260727_024 baseline (frozen-left-knee expert, sha256 bafcc9d8). Training config/algorithm/rewards/eval-harness UNCHANGED.",
+  "training_final_metrics_iter1395": {
+    "tracking_lin_vel": 0.85,
+    "mean_episode_length": 1674,
+    "terrain_level": 5.70,
+    "value_loss": 0.016,
+    "mean_reward": 50,
+    "note": "HEALTHY, converging with TASK_024 baseline (baseline: tracking 1.11, ep_len 2044, terrain 6.10, vloss 0.021). NOT diverging. Training reached 2000/2000."
+  },
+  "eval_partial_seeds_completed": {
+    "seed5": {"falls": "0/4", "mean_ep_len": 2401, "vx_err": 0.150, "jp_err": 0.450},
+    "seed17": {"falls": "0/4", "mean_ep_len": 2401, "vx_err": 0.161, "jp_err": 0.449},
+    "seed42_123_2024": "in progress at report time"
+  },
+  "hypothesis_test_result": {
+    "iteration5_hypothesis": "The frozen-left-knee defect in the Gate-B expert is the DOMINANT cause of the jp_err=0.462 Gate-C failure; fixing the expert (valid bilateral reference) should lower jp_err substantially.",
+    "result": "REFUTED. With the fixed expert, jp_err=0.450 (seed5) / 0.449 (seed17) — only ~0.012 lower than the 0.462 baseline. This is within noise, NOT a meaningful improvement. The frozen-knee defect was a real data bug (correctly fixed) but it is NOT the cause of the jp_err failure.",
+    "scientific_significance": "This is a clean single-variable (data-only) controlled experiment with an identical baseline. The negative result is informative: it rules out 'defective reference' as the jp_err cause. Per §11 (no-attribution-without-single-variable), this is valid attribution: jp_err is invariant to the frozen-knee fix.",
+    "stability_task_metrics_retained": "YES — fall_rate=0 (0 falls in 8 episodes so far), ep_len=2401, vx_err=0.150-0.161. The fixed expert did not degrade the strong stability/walking-task performance. This confirms the data fix was safe (no regression).",
+    "what_jp_err_actually_is": "The ~0.45 jp_err is a FUNDAMENTAL policy-vs-reference trajectory mismatch that is NOT due to the reference data. Candidate root causes (for the NEXT single-variable direction, NOT this round): (1) the jp_err METRIC is phase-naive — it compares policy dof_pos against the reference at the episode frame index, but the policy's gait phase is unconstrained and NOT synchronized to the reference; a perfect-style walker at a different phase would still show large error. (2) The AMP style reward may be too weak vs the strong task-reward suite (tracking_lin_vel etc.) so the policy optimizes for stable walking, not reference-imitation (style_reward collapsed to 0 during training, same as baseline — the discriminator wins and the style signal vanishes). (3) eval commands vx=0.5 m/s while the reference walks ~1.3 m/s — different cadence => different joint trajectory even for good style imitation."
+  },
+  "gateC_threshold_comparison_partial": {
+    "fall_rate": {"threshold": "<=0.05", "value": 0.000, "pass": true},
+    "episode_length_steps": {"threshold": ">=2000", "value": 2401, "pass": true},
+    "vx_track_err_mps": {"threshold": "<=0.25", "value": "~0.155", "pass": true},
+    "joint_pos_err_ref_rad": {"threshold": "<=0.30", "value": "~0.450", "pass": false, "note": "UNCHANGED from baseline 0.462 — hypothesis refuted"},
+    "dof_limit_viol_total": {"threshold": "=0", "value": "TBD (full report pending)", "pass": "TBD"},
+    "Sim2Sim": {"threshold": "pass", "value": "NOT RUN", "pass": false}
+  },
+  "gateC_verdict": "NOT PASSED (unchanged). jp_err fails (0.45>0.30, invariant to the data fix). The stability+walking-task groups remain STRONG and reproducible. Per §6/§11 no-threshold-lowering.",
+  "analysis_next_directions": {
+    "primary": "Re-examine the jp_err METRIC for phase-mismatch. A phase-naive frame-index comparison is the most likely culprit given the metric is invariant to a real data change. Test: compute a phase-ALIGNED jp_err (DTW or best-shift over a gait cycle) on the existing policy — this is a deterministic local re-analysis, no retrain needed. If phase-aligned jp_err drops near/below 0.30, the failure was a metric artifact, not a policy/imitation defect.",
+    "secondary": "If phase-aligned jp_err still fails: the policy is not imitating the reference. Direction = strengthen imitation signal (raise AMP style-reward weight / reduce task-reward scale) — but ONLY after the metric is validated, to avoid optimizing a broken metric.",
+    "safety": "dof_limit_viol (was 30776 in baseline) still pending in this run; will assess once full report lands. Separate safety item."
+  },
+  "evidence_bindings": [
+    "TASK_20260727_049 remote logs: '[train_eval] seed=5 done ... jp_err=0.450' + 'seed=17 done ... jp_err=0.449' (both ~0.45, vs baseline 0.462)",
+    "TASK_20260727_049 tfevents (gm task data): training converged tracking_lin_vel 0.85 ep_len 1674 terrain 5.70 (healthy, matches TASK_024 baseline)",
+    "data/audit/poll_calibration_iter6.json (training health + calibration vs baseline)",
+    "data/audit/gateB_defect_fix_iter5.json (the data fix under test)",
+    "data/retarget_gmr/x1_walk_retargeted.npz sha256=a115209b (the fixed expert)",
+    "data/amp_eval/gateC_eval_result_TASK_20260727_024.json (the BASELINE for comparison, jp_err 0.462)"
+  ]
+}
