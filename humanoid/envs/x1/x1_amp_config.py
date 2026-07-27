@@ -16,7 +16,8 @@ class X1AMPCfg(X1DHStandCfg):
         # to survive, without the soft-penalty safety-vs-performance tradeoff (iter-15 finding).
         # The plain PPO baseline (x1_dh_stand) inherits safety without this flag -> unaffected.
         terminate_on_joint_limit = True
-        joint_limit_termination_margin = 0.05
+        joint_limit_termination_margin = 0.15  # widened from 0.05 (iter-16: too tight, caused lateral drift 4m);
+                                                # 0.15 allows the ~0.014 rad PD overshoot while catching severe violations
 
     class rewards(X1DHStandCfg.rewards):
         # Keep the task reward (gait/velocity) but down-weight tracking slightly so the
