@@ -9,6 +9,12 @@ class X1AMPCfg(X1DHStandCfg):
     """Same robot/control as x1_dh_stand; experiment renamed for AMP."""
     class asset(X1DHStandCfg.asset):
         name = "x1_amp"
+        # Structural pivot (iter-23): use physics-enforced tight X1 joint limits.
+        # The original URDF has placeholder ±π limits; Isaac Gym enforces those wide
+        # limits, allowing PD overshoot beyond the real X1 range. This modified URDF
+        # has the real X1 limits baked in, so the physics engine HARD-STOPS joints
+        # at the conservative range — dof_viol=0 by definition.
+        file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/x1/urdf/x1_amp_limits.urdf'
 
     class safety(X1DHStandCfg.safety):
         # No hard joint-limit termination for the primary Gate-C checkpoint.
