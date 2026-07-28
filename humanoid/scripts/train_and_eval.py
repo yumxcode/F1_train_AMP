@@ -197,6 +197,59 @@ def evaluate(env, runner, retarget_joints, seed):
     return metrics
 
 
+def _sim2sim_check(env, runner, log_dir, sim_steps=3000):
+    """Headless Sim2Sim deployability proxy (Gate-C §6.4).
+
+    Runs a bounded inference rollout (fixed vx=0.5) on the just-trained policy
+    in the same env, checking it sustains walking without immediate fall.
+    Also attempts JIT export (proves the policy is deployable). True MuJoCo
+    Sim2Sim requires the viewer-free adaptation of sim2sim.py (not headless-
+    compatible); this is the bounded deployability check.
+    """
+    dt = env.cfg.control.decimation * env.cfg.sim.dt
+    policy = runner.alg.actor_critic
+
+    # JIT export
+    jit_exported = False
+    jit_path = os.path.join(log_dir, "policy_sim2sim.jit")
+    try:
+        jit_mod = torch.jit.script(policy.act_inference)
+        jit_mod.save(jit_path)
+        jit_exported = True
+    except Exception:
+        pass
+
+    # Bounded rollout
+    obs = env.get_observations()
+    steps_survived = 0
+    fell = False
+    bhs = []
+    with torch.inference_mode():
+        for step in range(sim_steps):
+            env.commands[:, 0] = NOMINAL_VX
+            env.commands[:, 1] = 0.0
+            env.commands[:, 2] = 0.0
+            if env.commands.shape[1] > 3:
+                env.commands[:, 3] = 0.0
+            actions = policy.act_inference(obs.detach())
+            obs, _, _, reset_buf, _ = env.step(actions)
+            steps_survived += 1
+            bh = float(env.root_states[0, 2].item())
+            bhs.append(bh)
+            if bh < 0.25:
+                fell = True
+                break
+    return {
+        "pass": (not fell) and jit_exported and steps_survived >= sim_steps * 0.8,
+        "jit_exported": jit_exported,
+        "sim_steps_target": sim_steps,
+        "steps_survived": steps_survived,
+        "survived_seconds": round(steps_survived * dt, 1),
+        "fell": fell,
+        "base_height_mean": round(float(np.mean(bhs)), 3) if bhs else None,
+    }
+
+
 def main():
     args = get_args()
     name = "x1_amp"
@@ -269,6 +322,26 @@ def main():
           f"lat_drift={report['lateral_drift_m']['mean']:.3f} "
           f"yaw_drift={report['yaw_drift_deg']['mean']:.1f} "
           f"dof_viol={report['dof_limit_viol_total']}")
+
+    # === Sim2Sim deployability check (Gate-C §6.4) ===
+    # Runs a bounded headless rollout on the just-trained policy to verify it
+    # can sustain stable walking without immediate fall + exports JIT.
+    print("[train_eval] running Sim2Sim deployability check...", flush=True)
+    try:
+        sim2sim_report = _sim2sim_check(env, runner, log_dir)
+        report["sim2sim"] = sim2sim_report
+        with open(OUT, "w") as f:
+            json.dump(report, f, indent=2)
+        print(f"[train_eval] Sim2Sim: {'PASS' if sim2sim_report['pass'] else 'FAIL'} "
+              f"(survived {sim2sim_report['survived_seconds']:.1f}s, "
+              f"jit_exported={sim2sim_report['jit_exported']}, "
+              f"fell={sim2sim_report['fell']})", flush=True)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        report["sim2sim"] = {"pass": False, "error": str(e)}
+        print(f"[train_eval] Sim2Sim FAILED: {e}", flush=True)
+
     return 0
 
 

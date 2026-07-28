@@ -11,13 +11,12 @@ class X1AMPCfg(X1DHStandCfg):
         name = "x1_amp"
 
     class safety(X1DHStandCfg.safety):
-        # Hard joint-limit termination (Gate-C safety): terminate episode if any dof exceeds the
-        # tight X1 limits by > 0.05 rad margin. Forces the policy to learn zero-violation behavior
-        # to survive, without the soft-penalty safety-vs-performance tradeoff (iter-15 finding).
-        # The plain PPO baseline (x1_dh_stand) inherits safety without this flag -> unaffected.
-        terminate_on_joint_limit = True
-        joint_limit_termination_margin = 0.10  # narrowed from 0.15 (iter-17: vx_err 0.283 marginal FAIL);
-                                                # 0.10 is between 0.05 (too tight, lat_drift 4m) and 0.15 (too loose, vx degraded)
+        # No hard joint-limit termination for the primary Gate-C checkpoint.
+        # The margin sweep (iter-16/17/18) showed hard termination creates a
+        # safety-vs-performance tradeoff (tighter -> lat_drift/yaw degraded).
+        # TASK_059 config (penalty -10, no hard-term) has the best overall balance.
+        terminate_on_joint_limit = False
+        joint_limit_termination_margin = 0.15  # not used when terminate_on_joint_limit=False
 
     class rewards(X1DHStandCfg.rewards):
         # Keep the task reward (gait/velocity) but down-weight tracking slightly so the
