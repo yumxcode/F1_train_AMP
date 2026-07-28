@@ -1,0 +1,18 @@
+{
+  "taskBaseInfo": {
+    "taskName": "gateC-run15-structural-pivot-urdf-limits",
+    "taskDescription": "STRUCTURAL PIVOT (§9): physics-enforced X1 joint limits via modified URDF (x1_amp_limits.urdf). The original URDF has placeholder ±π limits; Isaac Gym physics enforced those wide limits allowing PD overshoot beyond the real X1 range (dof_viol 30k-47k). The modified URDF bakes in the real X1 limits so the physics engine hard-stops joints — dof_viol=0 by physics definition. Same training config (penalty -10, no hard-term, 1500-iter). This is a structural change (physics constraint), not a reward/algorithm tweak. Commit adc4bc5.",
+    "taskTag": ["gateC", "structural-pivot", "physics-limits"],
+    "projectId": "PRO_20251113_021", "imageId": "BJX00000001", "imageVersion": "V000124",
+    "goodsId": "ESKU000001", "gpuNum": 1, "taskType": "1", "trainType": "1", "personalDataPath": "/personal"
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "commitId": "adc4bc5", "mainCodeType": "1", "mainCodeName": "train_and_eval.py",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/train_and_eval.py",
+    "mainWorkDir": "F1_train_AMP/humanoid/scripts",
+    "startScript": "gm-run F1_train_AMP/humanoid/scripts/train_and_eval.py --task=x1_amp --headless --seed=5 --num_envs=4096 --max_iterations=1500",
+    "isOpen": "1", "pullSubmodules": "1", "checkPointFilePath": "", "runParams": ""
+  }
+}
