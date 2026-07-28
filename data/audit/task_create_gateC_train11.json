@@ -1,0 +1,29 @@
+{
+  "taskBaseInfo": {
+    "taskName": "gateC-run11-hard-term-010",
+    "taskDescription": "Gate-C run with hard joint-limit termination margin=0.10 rad (between 0.05 too-tight lat_drift 4m and 0.15 too-loose vx_err 0.283). Targeting the Pareto-optimal tradeoff. Penalty -10. Corrected metrics. 1500-iter. Commit 9f3f369.",
+    "taskTag": ["gateC", "safety-fix", "margin-010"],
+    "projectId": "PRO_20251113_021",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "goodsId": "ESKU000001",
+    "gpuNum": 1,
+    "taskType": "1",
+    "trainType": "1",
+    "personalDataPath": "/personal"
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "commitId": "9f3f369",
+    "mainCodeType": "1",
+    "mainCodeName": "train_and_eval.py",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/train_and_eval.py",
+    "mainWorkDir": "F1_train_AMP/humanoid/scripts",
+    "startScript": "gm-run F1_train_AMP/humanoid/scripts/train_and_eval.py --task=x1_amp --headless --seed=5 --num_envs=4096 --max_iterations=1500",
+    "isOpen": "1",
+    "pullSubmodules": "1",
+    "checkPointFilePath": "",
+    "runParams": ""
+  }
+}
