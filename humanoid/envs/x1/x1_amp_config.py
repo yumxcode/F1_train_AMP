@@ -23,8 +23,8 @@ class X1AMPCfg(X1DHStandCfg):
         terminate_on_joint_limit = False
         joint_limit_termination_margin = 0.15
         limit_damping = True
-        limit_damping_margin = 0.85  # activate in outer 15% of joint range
-        limit_damping_gain = 50.0    # extra kd coefficient (scales quadratically)
+        limit_damping_margin = 0.80  # widened from 0.85 (activate in outer 20% vs 15%)
+        limit_damping_gain = 80.0    # increased from 50 (stronger damping near limits)
 
     class rewards(X1DHStandCfg.rewards):
         # Keep the task reward (gait/velocity) but down-weight tracking slightly so the
