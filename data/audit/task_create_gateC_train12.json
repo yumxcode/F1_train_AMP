@@ -1,0 +1,29 @@
+{
+  "taskBaseInfo": {
+    "taskName": "gateC-run12-final-sim2sim",
+    "taskDescription": "Gate-C FINAL comprehensive run: TASK_059 config (penalty -10, no hard-term — best overall balance) + ALL corrected metrics (analytic-ref jp_err, yaw angular velocity, anti-hang) + Sim2Sim deployability check (JIT export + bounded headless rollout). This is the most complete Gate-C evaluation. Commit 3dc5db1. 1500-iter budget-safe.",
+    "taskTag": ["gateC", "final", "sim2sim"],
+    "projectId": "PRO_20251113_021",
+    "imageId": "BJX00000001",
+    "imageVersion": "V000124",
+    "goodsId": "ESKU000001",
+    "gpuNum": 1,
+    "taskType": "1",
+    "trainType": "1",
+    "personalDataPath": "/personal"
+  },
+  "taskCodeInfo": {
+    "codeType": "2",
+    "codeUrl": "[{\"codeUrl\":\"https://github.com/yumxcode/F1_train_AMP.git\",\"versionType\":\"1\",\"versionName\":\"amp-gateA-smoke\"}]",
+    "commitId": "3dc5db1",
+    "mainCodeType": "1",
+    "mainCodeName": "train_and_eval.py",
+    "mainCodeUri": "F1_train_AMP/humanoid/scripts/train_and_eval.py",
+    "mainWorkDir": "F1_train_AMP/humanoid/scripts",
+    "startScript": "gm-run F1_train_AMP/humanoid/scripts/train_and_eval.py --task=x1_amp --headless --seed=5 --num_envs=4096 --max_iterations=1500",
+    "isOpen": "1",
+    "pullSubmodules": "1",
+    "checkPointFilePath": "",
+    "runParams": ""
+  }
+}
