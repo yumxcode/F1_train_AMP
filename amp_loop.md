@@ -6,7 +6,8 @@
 
 - Roboparty 训练说明：<https://github.com/Roboparty/roboto_origin/blob/main/modules/roboparty_train/README_CN.md>
 - Roboparty GMR：<https://github.com/Roboparty/GMR>
-- 参考项目只用于理解 AMP 组成、动作数据准备、关节重排、训练/测试和 Sim2Sim 流程；必须结合 F1 的 URDF/MJCF、关节定义、控制频率和现有工程结构实现，禁止直接照搬 RPO/Atom01 的关节索引或参数。
+- roboparty_train参考项目只用于理解 AMP 组成、动作数据准备、关节重排、训练/测试和 Sim2Sim 流程；必须结合 F1 的 URDF/MJCF、关节定义、控制频率和现有工程结构实现，禁止直接照搬 RPO/Atom01 的关节索引或参数。
+- GMR重定向参考项目是重定向的参照实现，请全面复现GMR F1适配版，必须结合 F1 的 URDF/MJCF，不得简化IK等，确保重定向结果准确。
 
 请按以下协议设计图。
 
@@ -88,14 +89,10 @@ Gate A 必须同时满足：
 
 行走重定向是 AMP 的关键输入，必须作为独立阶段优化，不得把未经验证的数据直接送入训练。
 
-重定向流程至少包括：
+重定向流程按照参照GMR项目流程包括：
 
 - 选择来源明确、允许使用、包含稳定周期行走的参考动作；保存原始数据哈希、fps、clip 范围和左右脚接触信息；
-- 基于 F1 模型建立 T-pose/初始姿态、human-to-F1 keypoint/link 对应、尺度、位置/旋转 offset 和 IK 约束；
-- 明确 world/base 坐标、up axis、长度/角度单位、四元数顺序和朝向约定；
-- 执行 human motion → F1 `(root_translation, root_rotation, joint_positions)` 重定向；
 - 按 F1 URDF/MJCF 与训练环境实际使用顺序建立显式 joint mapping，再转换为 AMP loader 所需格式；不可依赖字典插入顺序或硬编码他机索引；
-- 由相邻帧和真实 `dt` 一致计算 root/joint 速度，处理首尾帧、循环拼接、插值和滤波，禁止用错误 fps 放大速度；
 - 生成可视化视频、数值报告和最终专家动作 manifest；原始、重定向中间结果、关节重排后训练数据要版本化区分。
 
 每个候选 clip 都必须检查：
@@ -108,7 +105,6 @@ Gate A 必须同时满足：
 
 Gate B 必须同时满足：
 
-- `retarget_manifest.json` 完整且能从源数据确定性重建训练数据；
 - 数据通过 schema、单位、坐标系、关节映射、范围、连续性和接触检查；
 - 至少一个参考行走 clip 通过完整可视化回放和定量验收；
 - AMP loader 读取该数据后的统计与重定向输出一致；
@@ -136,6 +132,7 @@ Gate B 必须同时满足：
 - 速度、步态相位、足滑、姿态和模仿误差的具体阈值必须在首次正式训练前依据 F1 尺寸、控制频率和参考 clip 写入 `task_spec.md`；
 - 在受控 domain randomization 和 MuJoCo Sim2Sim 中重复评测；若未达到预先冻结的 Sim2Sim 阈值，不得标记 completed；
 - 最终 checkpoint 必须可 resume、可 play、可导出，且导出策略的 observation/action 契约与训练一致。
+- F1关节限位可稍微放宽，不作为严格要求（但不要出现频繁、过量的关节动作超限）
 
 判定训练改善时采用固定评测结果，不以训练窗口内的 reward 峰值、单次视频或 discriminator accuracy 单独作结论。
 
