@@ -209,15 +209,23 @@ def _sim2sim_check(env, runner, log_dir, sim_steps=3000):
     dt = env.cfg.control.decimation * env.cfg.sim.dt
     policy = runner.alg.actor_critic
 
-    # JIT export
+    # JIT export (use trace: more compatible than script for custom act_inference)
     jit_exported = False
     jit_path = os.path.join(log_dir, "policy_sim2sim.jit")
     try:
-        jit_mod = torch.jit.script(policy.act_inference)
-        jit_mod.save(jit_path)
+        example_obs = env.get_observations()[:1].detach()
+        traced = torch.jit.trace(policy.act_inference, example_obs)
+        traced.save(jit_path)
         jit_exported = True
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[sim2sim] JIT trace also failed: {e}")
+        # Fallback: try the standard export_policy_as_jit helper
+        try:
+            from humanoid.utils.helpers import export_policy_as_jit
+            export_policy_as_jit(policy, log_dir)
+            jit_exported = True
+        except Exception as e2:
+            print(f"[sim2sim] JIT export fallback also failed: {e2}")
 
     # Bounded rollout
     obs = env.get_observations()
