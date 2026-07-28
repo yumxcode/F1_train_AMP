@@ -16,12 +16,15 @@ class X1AMPCfg(X1DHStandCfg):
         # achievable balance per the margin sweep (iter-15 to iter-22).
 
     class safety(X1DHStandCfg.safety):
-        # No hard joint-limit termination for the primary Gate-C checkpoint.
-        # The margin sweep (iter-16/17/18) showed hard termination creates a
-        # safety-vs-performance tradeoff (tighter -> lat_drift/yaw degraded).
-        # TASK_059 config (penalty -10, no hard-term) has the best overall balance.
+        # No hard joint-limit termination (iter-16/17/18/23 all failed).
+        # Structural pivot (iter-24): position-dependent damping near joint limits.
+        # Adds extra PD damping as dof_pos approaches the tight X1 range, decelerating
+        # joints before physics-integration overshoot. Control-architecture change.
         terminate_on_joint_limit = False
-        joint_limit_termination_margin = 0.15  # not used when terminate_on_joint_limit=False
+        joint_limit_termination_margin = 0.15
+        limit_damping = True
+        limit_damping_margin = 0.85  # activate in outer 15% of joint range
+        limit_damping_gain = 50.0    # extra kd coefficient (scales quadratically)
 
     class rewards(X1DHStandCfg.rewards):
         # Keep the task reward (gait/velocity) but down-weight tracking slightly so the

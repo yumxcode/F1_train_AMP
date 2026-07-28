@@ -749,7 +749,25 @@ class LeggedRobot(BaseTask):
             motor_strength_ranges = self.cfg.domain_rand.torque_multiplier_range
             self.torque_multi = torch_rand_float(motor_strength_ranges[0], motor_strength_ranges[1], (self.num_envs,self.num_actions), device=self.device)
             torques *= self.torque_multi
-            
+
+        # Position-dependent damping near joint limits (structural pivot iter-24, §9):
+        # Increases damping as dof_pos approaches the tight X1 limits, decelerating joints
+        # before they overshoot. This is a CONTROL-ARCHITECTURE change (not reward/penalty):
+        # the standard PD controller has constant kd; this adds a position-dependent kd that
+        # grows quadratically as the joint enters the last 10% of its range, absorbing momentum
+        # before the physics integration overshoots. Gate-gated so plain PPO is unaffected.
+        if getattr(self.cfg.safety, 'limit_damping', False) and hasattr(self, 'dof_pos_limits'):
+            lo, hi = self.dof_pos_limits[:, 0], self.dof_pos_limits[:, 1]
+            rng = (hi - lo).clamp(min=0.01)
+            # normalized distance from center: 0 at center, 1 at limit
+            norm_dist = torch.abs(self.dof_pos - 0.5 * (lo + hi)) / (0.5 * rng)
+            # only activate in the outer 15% of the range
+            margin = float(getattr(self.cfg.safety, 'limit_damping_margin', 0.85))
+            excess = (norm_dist - margin).clamp(min=0.0) / (1.0 - margin)
+            # additional damping scales with how far into the danger zone
+            extra_kd = getattr(self.cfg.safety, 'limit_damping_gain', 50.0) * excess.pow(2)
+            torques = torques - extra_kd.unsqueeze(0) * self.dof_vel
+
         return torch.clip(torques, -self.torque_limits, self.torque_limits)
 
     
