@@ -34,12 +34,10 @@
 任务状态放在 `{taskDir}/state/`：
 
 - `task_spec.md`：总目标、三个阶段的里程碑、固定评测集、数值阈值和成功标准；
-- `progress.json`：至少包含 `iteration`、`phase`、`phase_status`、`status`、`stale_count`、`total_findings`、`code_revision`、`dataset_revision`、`updated_at`；
+- `progress.json`：至少包含 `iteration`、`phase`、`phase_status`、`total_findings`、`code_revision`、`dataset_revision`、`updated_at`；
 - `findings.jsonl`：append-only，记录每轮新增 findings，且标记所属阶段、实验/数据版本和证据路径；
 - `directions_tried.json`：按阶段记录已尝试方向、假设、结果和是否允许重试；
 - `iteration_log.jsonl`：append-only，记录每轮摘要、判断、门禁结果和路由；
-- `amp_contract.json`：AMP observation、expert transition、policy transition、discriminator、replay buffer、style reward、task reward、归一化和 checkpoint/export 的接口契约；
-- `retarget_manifest.json`：源动作、许可证/来源、F1 模型版本、关节映射、坐标系、单位、四元数约定、帧率、裁剪范围、输出文件及校验统计；
 - `evaluation.json`：固定评测协议、各 checkpoint 指标、seed 级结果和最终验收结论。
 
 日志放在 `{taskDir}/logs/`：
@@ -140,8 +138,7 @@ Gate B 必须同时满足：
 
 图中包含这些阶段感知节点：
 
-- `load_state`：读取 task spec、phase、progress、directions、findings 摘要、AMP contract、retarget manifest 和 evaluation；
-- `audit_preconditions`：检查当前阶段的代码、数据、CLI、凭据、远端资源和前一 Gate 证据；
+- `load_state`：读取 task spec、phase、progress、directions、findings 摘要、evaluation；
 - `choose_direction`：只选择当前 phase 内与历史不同、可证伪的方向，写清假设、改动面和预期指标；
 - `research_design_execute`：按当前 phase 执行 AMP 实现、重定向实验或训练实验；一次只改变一个主要假设，保留可比较 baseline；
 - `monitor_remote_job`：监控 Gradmotion 任务并拉取曲线与产物；
@@ -154,38 +151,57 @@ Gate B 必须同时满足：
 
 ## 8. stale、路由与完成规则
 
-每个 phase 独立维护有效进展；切换 phase 后 `stale_count` 清零，但保留完整历史。
+## 路由总览
+三个阶段分别维护自己的路由状态，不共用。
+上层维护 A_healthy,B_healthy,C_healthy,默认值为false.
+只有X_healthy==true时，才允许进入下一阶段。
 
-- 0 个 new findings，或固定评测结果显著变差 → `stale_count + 1`；
-- 有可复现的新 finding 且结果改善 → `stale_count` 清零或降低；
-- `stale_count >= 2` → `status = pivot_required`；
-- `stale_count >= 4` → `status = attention_required`；
-- 其他为 `healthy` 或 `stale`；
-- 执行/数据损坏/外部任务失败且无法在本轮恢复 → `error`。
+### AMP 工程化（Gate A）
+- 维护stale_countA,默认值为0。
+- GateA路由规则：
+  - 执行项目AMP改造，代码提交验证：
+  - 通过： A_healthy=true
+  - 不通过：stale_countA+1
+  - stale_countA >= 10时 -> error,整体停止
+  - 执行/数据损坏/外部任务失败且无法在本轮恢复时 -> error,整体停止
 
-路由规则：
+ 
+###  阶段二：F1 行走重定向（Gate B）
+- 维护stale_countB,默认值为0
+- GateB路由规则：
+  - 参照GMR项目流程，进行本地GMR F1项目建立或改造，代码提交验证：
+  - 通过： B_healthy= true
+  - 不通过：stale_countB+1
+  - stale_countB >= 10时 -> error,整体停止
+  - 执行/数据损坏/外部任务失败且无法在本轮恢复时 -> error,整体停止
 
-- `healthy` 且当前 Gate 未通过：留在当前 phase 进入下一轮；
-- 当前 Gate 通过：按 `amp_conversion → motion_retargeting → amp_training → completed` 推进；
-- `stale`：留在当前 phase 并选择多样化方向；
-- `pivot_required`：进入当前 phase 对应的 `structural_pivot`；
-- `attention_required`：写报告后停止，不向用户提问；
-- `error`：写错误状态和 iteration log 后停止；
-- `completed`：写最终验收报告、最佳 checkpoint、数据/配置/代码版本和复现命令后优雅退出。
 
-## 9. Structural pivot
+###  阶段三：AMP 训练与最终指标（Gate C）
+- 维护stale_countC,默认值为0，status_C 默认为normal
+- GateC路由规则：
+  - stale_countC >= 2时 -> status_C = pivot_stateC
+  - stale_countC >= 4时 -> status_C = attention_required
+  - 执行/数据损坏/外部任务失败且无法在本轮恢复 -> status_C = error
 
-当 `stale_count >= 2` 时，不得只调学习率、reward scale 或网络宽度，必须改变结构性约束或研究框架。例如：
+  - 当status_C == normal时，应该执行：
+    - 选择一个方向进行项目AMP训练，查看训练结果：
+      - 通过，则GateC结束：C_healthy=true
+      - 不通过或无效或变差 -> stale_countC +1
+      - 有效果或有效 -> stale_countC -1 
+    - stale_countC最小值为0
+  - 当status_C == pivot_stateC时：进入方案重设阶段，应该执行：
+    - 从相反假设出发，补充消融实验或更换证据类型；
+    - 调研高置信度的一手论文/官方实现并记录与当前实现的结构差异
+    - 重新设计完后，stale_countC = 0，status_C=normal
+    - 必须更新 `directions_tried.json`，写明为什么旧方向失效以及新方向如何区分于已尝试方案。
+  - 当status_C == attention_required时,应该执行：
+    - 写报告后停止，整体停止。
+  - 当status_C == error时，应该执行：
+    - 整体停止
 
-- AMP 工程化阶段：重新核对 expert/policy feature contract、时间表示、reward 变换、buffer 分布或 discriminator 正则；
-- 重定向阶段：改变 keypoint mapping、IK 约束、尺度/offset、接触约束、clip 选择或数据源；
-- 训练阶段：重新检查数据覆盖、style/task reward 冲突、curriculum、初始化分布、控制频率或评测假设；
-- 从相反假设出发，补充消融实验或更换证据类型；
-- 调研高置信度的一手论文/官方实现并记录与当前实现的结构差异。
 
-Pivot 后必须更新 `directions_tried.json`，写明为什么旧方向失效以及新方向如何区分于已尝试方案。
 
-## 10. 远端训练与恢复
+## 9. 远端训练与恢复
 
 - 训练在远端 Gradmotion 执行；启动前记录代码 revision、配置、数据 hash、seed、命令和 task ID；
 - 建议约每 30 分钟检查一次结果。进入平台期且无明确改善趋势时及时终止并进入 `extract_findings`，不要仅为等待 max iterations 消耗资源；
@@ -193,11 +209,10 @@ Pivot 后必须更新 `directions_tried.json`，写明为什么旧方向失效�
 - Gradmotion 账号无余额时，先执行 `account-pool remove <当前 id>`，再执行 `account-pool get` 获取有额度账号并有界重试；换号事件写入日志，但不改变研究结论；
 - 网络、队列、余额和任务失败都必须有有限重试、退避和恢复路径，不得形成忙等循环。
 
-## 11. 边界与禁止事项
+## 10. 边界与禁止事项
 
 - 所有节点、训练、轮询、重试、phase 迭代和总 loop 都必须有合理 bounds，并有优雅退出路径；
 - 不得将“代码能 import”“数据能 load”“reward 上升”或“视频看起来会动”单独视为阶段完成；
 - 不得复用错误机器人关节顺序、坐标系或物理参数；不得静默 drop/补零不匹配关节；
 - 不得在同一实验同时大改数据、算法、奖励和控制参数后声称归因成立；
-- findings 必须绑定可读取的日志、指标、视频、数据报告或代码 diff；无证据的主观描述不算 new finding；
 - attention_required、error 和 completed 都必须写完 state/log/report 后停止，不依赖撞上限退出，也不触发用户交互。
