@@ -181,12 +181,17 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
 
     def _log_amp(self, locs, dm):
         # PPO logs already happen in parent log(); here we log AMP-specific scalars.
-        if self.writer is None:
-            return
-        for k, v in dm.items():
-            self.writer.add_scalar("AMP/" + k, v, locs["it"])
-        self.writer.add_scalar("AMP/expert_logit_ema", float(self.expert_logit_ema), locs["it"])
-        self.writer.add_scalar("AMP/policy_buffer_size", self.policy_amp_buffer.size, locs["it"])
+        if self.writer is not None:
+            for k, v in dm.items():
+                self.writer.add_scalar("AMP/" + k, v, locs["it"])
+            self.writer.add_scalar("AMP/expert_logit_ema", float(self.expert_logit_ema), locs["it"])
+            self.writer.add_scalar("AMP/policy_buffer_size", self.policy_amp_buffer.size, locs["it"])
+        # Console summary so remote smoke/train logs surface the INDEPENDENT AMP metrics
+        # (discriminator loss, gradient penalty, style reward) needed as Gate-A evidence.
+        print(f"  [AMP] iter={locs['it']} disc_loss={dm['loss']:.4f} gp={dm['grad_penalty']:.4f} "
+              f"style_r={dm['style_reward']:.4f} acc={dm['accuracy']:.3f} "
+              f"e_logit={dm['expert_logit']:.3f} p_logit={dm['policy_logit']:.3f} "
+              f"ema={float(self.expert_logit_ema):.3f}", flush=True)
 
     # ------------------------------------------------------------------ #
     def save(self, path, infos=None):
