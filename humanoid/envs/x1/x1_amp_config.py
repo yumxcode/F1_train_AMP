@@ -58,9 +58,9 @@ class X1AMPCfgPPO(X1DHStandCfgPPO):
         # Discriminator feature contract (must equal MotionLib.AMP_OBS_DIM == 35).
         disc_input_dim = AMP_OBS_DIM
         disc_hidden_dims = [1024, 512]
-        disc_lr = 1e-4
+        disc_lr = 5e-5               # 1e-4 -> 5e-5: slow discriminator to prevent domination
         disc_grad_penalty_coef = 5.0
-        disc_train_iters = 2           # discriminator updates per PPO iteration
+        disc_train_iters = 1         # 2 -> 1: fewer disc updates per PPO iter (anti-domination)
         disc_batch_size = 4096
         # Style reward mixing.
         style_weight = 1.0

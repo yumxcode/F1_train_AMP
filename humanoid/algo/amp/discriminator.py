@@ -32,26 +32,26 @@ class Discriminator(nn.Module):
 
     def compute_reward(self, policy_logit: torch.Tensor, expert_logit_ema: torch.Tensor,
                        reward_clamp: float = 2.0) -> torch.Tensor:
-        """Standard AMP style reward.
+        """AMP style reward (Peng et al. 2021 ASE/AMP formulation).
 
-        With the standard-GAN discriminator training in ``compute_disc_loss`` the expert
-        logit is pushed to +inf (real) and the policy logit to -inf (fake). The style
-        reward must therefore *increase* as the policy logit rises toward the expert logit
-        (i.e. as the policy looks more expert-like).
+        Uses exp(-0.25 * max(0, ema_e - p_logit)) which NEVER collapses to zero even
+        when the discriminator dominates. This preserves a non-trivial gradient when
+        the policy is far from expert (prevents the "dead style reward" failure mode
+        observed in iter-1 training where the clamped linear reward hit exactly 0).
 
-            r = clamp(1 - 0.25*(ema(D(e)) - D(p)), 0, reward_clamp)
+        r = exp(-0.25 * max(0, ema(D(e)) - D(p)))
 
         Checks:
           * policy == expert  -> D(p) ~ D(e)        -> r ~ 1.0
-          * policy clearly fake -> D(p) -> -inf     -> r -> 0   (penalised)
-          * policy fools D     -> D(p) > D(e)       -> r in (1, 2] (rewarded)
+          * policy clearly fake -> D(p) -> -inf     -> r -> exp(-inf) -> 0 (but never EXACTLY 0)
+          * policy fools D     -> D(p) > D(e)       -> r ~ 1.0 (capped)
 
-        NOTE: the previous implementation used ``(D(p) - ema(D(e)))`` with the opposite sign,
-        which *decreased* as the policy improved and effectively rewarded maximally-fake
-        motion (clipped to the reward ceiling). That sign was inverted, so AMP would have
-        provided no useful style signal. Fix recorded as a Gate A audit finding.
+        The previous linear-clamp formula r=clamp(1-0.25*(ema-p),0,2) clamped to exactly
+        0 when the logit gap exceeded 4 (observed at iter ~100), killing the style
+        gradient entirely. The exponential formulation preserves gradient everywhere.
         """
-        r = 1.0 - 0.25 * (expert_logit_ema - policy_logit.squeeze(-1))
+        logit_diff = torch.clamp(expert_logit_ema - policy_logit.squeeze(-1), min=0.0)
+        r = torch.exp(-0.25 * logit_diff)
         return r.clamp(0.0, reward_clamp)
 
 
