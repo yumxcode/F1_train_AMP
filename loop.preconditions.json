@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "loop-preconditions-1.0",
+  "items": [
+    {
+      "kind": "directory",
+      "target": "gmr_f1",
+      "reason": "GMR reference implementation must be cloned from https://github.com/Roboparty/GMR into project-internal gmr_f1/ before Gate B retargeting work. The work lane has owned write on this directory but it must be created (cloned) before the loop can use it.",
+      "blocking": true
+    },
+    {
+      "kind": "command",
+      "target": "gm",
+      "reason": "Gradmotion gm CLI must be installed and callable for remote training task management (gm task info/logs, account-pool operations). Required for Gate C training.",
+      "blocking": true
+    },
+    {
+      "kind": "file",
+      "target": "data/0008_normal_walk4_stageii.npz",
+      "reason": "Reference walking source motion data. Already copied into the project per Blueprint assumptions; must exist for Gate B retargeting.",
+      "blocking": true
+    },
+    {
+      "kind": "file",
+      "target": "amp_loop.md",
+      "reason": "Source requirement document read by the work Agent every activation for detailed criteria. Must exist in project root.",
+      "blocking": true
+    },
+    {
+      "kind": "decision",
+      "target": "C25-audit-findings",
+      "reason": "Startup audit (C25) may discover that the real robot identity is X1 (not F1) or that F1 assets are missing. The audit outcome determines whether the project can proceed or must be recorded as a blocking precondition. The loop handles this at runtime via outcome='error', but the human must be aware that audit results may require external intervention.",
+      "blocking": false
+    },
+    {
+      "kind": "decision",
+      "target": "C14-eval-protocol-freeze",
+      "reason": "First entry into amp_training requires freezing the evaluation protocol (seeds, thresholds, terrain, DR). The work Agent will draft this, but the human should review the frozen values before Gate C training begins. This is a runtime decision, not a startup blocker.",
+      "blocking": false
+    }
+  ]
+}

@@ -1,0 +1,314 @@
+{
+  "schemaVersion": "graph-traceability-2.0",
+  "mappings": [
+    {
+      "constraintId": "C1",
+      "graphRefs": [
+        "/nodes/work/prompt"
+      ],
+      "rationale": "The work Agent's prompt encodes the full project goal across all phases (amp_conversion, motion_retargeting, amp_training, completed). The agent owns end-to-end execution responsibility; the graph routes phase transitions."
+    },
+    {
+      "constraintId": "C2",
+      "graphRefs": [
+        "/transitions/14",
+        "/transitions/15",
+        "/transitions/16",
+        "/state/phase"
+      ],
+      "rationale": "Phase ordering enforced deterministically by commit-success transitions advance_B (A_healthy→motion_retargeting, idx 14), advance_C (B_healthy→amp_training, idx 15), advance_done (C_healthy→completed, idx 16). No transition advances phase without the corresponding health flag true."
+    },
+    {
+      "constraintId": "C3",
+      "graphRefs": [
+        "/state/A_healthy",
+        "/state/B_healthy",
+        "/state/C_healthy",
+        "/transitions/14/when",
+        "/transitions/15/when",
+        "/transitions/16/when"
+      ],
+      "rationale": "All three health flags default false and are only set true by gate-specific transitions (gateA_pass idx 3, gateB_pass idx 5, gateC_pass idx 7). Phase advance transitions check each flag in their when conditions."
+    },
+    {
+      "constraintId": "C4",
+      "graphRefs": [
+        "/nodes/work/prompt",
+        "/transitions/3/when",
+        "/transitions/5/when",
+        "/transitions/7/when"
+      ],
+      "rationale": "Gate pass transitions require all verification flags simultaneously true in deterministic when conditions. The Agent cannot bypass these checks; the prompt forbids lowering thresholds."
+    },
+    {
+      "constraintId": "C5",
+      "graphRefs": [
+        "/transitions/3",
+        "/transitions/4",
+        "/transitions/18",
+        "/transitions/0"
+      ],
+      "rationale": "Gate A: gateA_pass (idx 3) sets A_healthy; gateA_fail (idx 4) increments stale_countA; gateA_stale_stop (idx 18) sets error=true and routes to commit for final write; stop_error (idx 12) then routes to failed; error_stop (idx 0) catches unrecoverable failures."
+    },
+    {
+      "constraintId": "C6",
+      "graphRefs": [
+        "/transitions/5",
+        "/transitions/6",
+        "/transitions/19",
+        "/transitions/0"
+      ],
+      "rationale": "Gate B mirrors Gate A: gateB_pass (idx 5)/gateB_fail (idx 6); gateB_stale_stop (idx 19) sets error and routes to commit for final write; error_stop for unrecoverable failures."
+    },
+    {
+      "constraintId": "C7",
+      "graphRefs": [
+        "/transitions/20",
+        "/transitions/21",
+        "/state/status_C"
+      ],
+      "rationale": "Gate C status transitions in commit-success routing: gateC_attention (idx 20, stale_countC>=4→attention_required) and gateC_pivot (idx 21, stale_countC>=2&&normal→pivot_stateC). Priority ensures attention wins over pivot."
+    },
+    {
+      "constraintId": "C8",
+      "graphRefs": [
+        "/transitions/7",
+        "/transitions/9",
+        "/transitions/11",
+        "/transitions/10",
+        "/state/stale_countC"
+      ],
+      "rationale": "Gate C normal: gateC_pass (idx 7) sets C_healthy; gateC_fail (idx 9) increments; gateC_better (idx 11) decrements with min-0 guard (when stale_countC>0)."
+    },
+    {
+      "constraintId": "C9",
+      "graphRefs": [
+        "/transitions/8",
+        "/transitions/10",
+        "/nodes/work/prompt"
+      ],
+      "rationale": "gateC_pivot_done (idx 8) resets stale_countC=0 and status_C=normal. Work Agent prompt instructs updating directions_tried.json with failure reasons during pivot."
+    },
+    {
+      "constraintId": "C10",
+      "graphRefs": [
+        "/transitions/20",
+        "/transitions/1",
+        "/transitions/12"
+      ],
+      "rationale": "attention_required: gateC_attention (idx 20) sets status, attention_reported (idx 1) forces error after report. stop_error (idx 12) routes to failed terminal."
+    },
+    {
+      "constraintId": "C11",
+      "graphRefs": [
+        "/lanes/writer/workspace/write",
+        "/nodes/commit/prompt"
+      ],
+      "rationale": "Writer lane declares exact write modes for all six state files. Commit prompt action 1 writes progress.json with ALL required C11 fields: iteration, phase, phase_status (derived), total_findings (counted), code_revision and dataset_revision (from commit_payload or carried forward)."
+    },
+    {
+      "constraintId": "C12",
+      "graphRefs": [
+        "/lanes/writer/workspace/write",
+        "/nodes/commit/prompt"
+      ],
+      "rationale": "Writer lane enforces append_only for findings.jsonl/iteration_log.jsonl/work.jsonl/orchestrator.jsonl and atomic_replace for progress.json/directions_tried.json/task_spec.md/evaluation.json."
+    },
+    {
+      "constraintId": "C13",
+      "graphRefs": [
+        "/transitions/14",
+        "/transitions/15",
+        "/transitions/16",
+        "/nodes/work/prompt",
+        "/nodes/commit/prompt"
+      ],
+      "rationale": "Phase advance transitions commit phase change; work Agent prompt instructs writing code_revision/dataset_revision in commit_payload; commit prompt carries these into progress.json."
+    },
+    {
+      "constraintId": "C14",
+      "graphRefs": [
+        "/transitions/15",
+        "/lanes/writer/workspace/write",
+        "/nodes/work/prompt"
+      ],
+      "rationale": "advance_C (idx 15) is the only transition that sets phase to amp_training; its when requires B_healthy==true. task_spec.md uses atomic_replace on writer lane. Work prompt instructs freezing eval protocol on first amp_training entry."
+    },
+    {
+      "constraintId": "C15",
+      "graphRefs": [
+        "/transitions/3/when",
+        "/nodes/work/prompt",
+        "/lanes/writer/workspace/write"
+      ],
+      "rationale": "gateA_pass requires gA_contract==true; work prompt instructs generating amp_contract.json; writer lane has atomic_replace on amp_contract.json."
+    },
+    {
+      "constraintId": "C16",
+      "graphRefs": [
+        "/nodes/work/prompt",
+        "/transitions/7/when"
+      ],
+      "rationale": "Work Agent prompt mandates ≥5 fixed seeds, mean/std/worst reporting, forbids cherry-picking. gateC_pass requires all four gC_* flags simultaneously true."
+    },
+    {
+      "constraintId": "C17",
+      "graphRefs": [
+        "/transitions/7/when",
+        "/transitions/9/when",
+        "/transitions/10/when",
+        "/transitions/11/when",
+        "/nodes/work/prompt"
+      ],
+      "rationale": "Gate C normal-mode transitions are mutually exclusive on outcome and each update stale_countC by at most 1 per activation. The prompt reinforces one-hypothesis-per-experiment."
+    },
+    {
+      "constraintId": "C18",
+      "graphRefs": [
+        "/transitions/3",
+        "/transitions/4",
+        "/transitions/5",
+        "/transitions/6",
+        "/transitions/7",
+        "/transitions/8",
+        "/transitions/9",
+        "/transitions/10",
+        "/transitions/11"
+      ],
+      "rationale": "Counter/status updates exclusively in deterministic transition updates using builtin reducers. Agent outputs semantic outcomes only; thresholds are in graph conditions."
+    },
+    {
+      "constraintId": "C19",
+      "graphRefs": [
+        "/lanes/writer/workspace/write",
+        "/nodes/commit/prompt",
+        "/nodes/work/prompt"
+      ],
+      "rationale": "Writer lane exclusively owns all state/ and logs/ writes. Work Agent prompt rule 1 forbids writing state/logs/. All persistence through commit node."
+    },
+    {
+      "constraintId": "C20",
+      "graphRefs": [
+        "/transitions/3/when",
+        "/transitions/5/when",
+        "/transitions/7/when",
+        "/transitions/14/when",
+        "/transitions/15/when",
+        "/transitions/16/when"
+      ],
+      "rationale": "gate_check = deterministic when conditions on gate pass transitions requiring all verification flags. route_by_status = priority-ordered commit-success transitions reading post-update $state."
+    },
+    {
+      "constraintId": "C21",
+      "graphRefs": [
+        "/transitions/12",
+        "/transitions/13",
+        "/transitions/1",
+        "/transitions/18",
+        "/transitions/19",
+        "/nodes/commit/prompt"
+      ],
+      "rationale": "All terminal paths route through commit first: stop_error (idx 12) and stop_completed (idx 13) are commit→terminal; gateA_stale_stop (idx 18) and gateB_stale_stop (idx 19) now route commit→commit (self-loop with error=true) so commit writes final error state/report, then stop_error catches error==true→failed. attention_reported (idx 1)→commit→stop_error→failed."
+    },
+    {
+      "constraintId": "C22",
+      "graphRefs": [
+        "/limits",
+        "/transitions/18",
+        "/transitions/19",
+        "/transitions/20",
+        "/transitions/23",
+        "/transitions/24"
+      ],
+      "rationale": "Graph limits bound activations (300), wall time (7 days), cost ($600). Gate stale stops (>=10) and Gate C attention/pivot provide task-level bounds. work_failed/commit_failed provide failure exits."
+    },
+    {
+      "constraintId": "C23",
+      "graphRefs": [
+        "/nodes/work/prompt",
+        "/nodes/work/timerPolicy"
+      ],
+      "rationale": "Work Agent prompt specifies bounded retry with account-pool rotation for quota. timerPolicy maxParks=48 bounds polling. Smoke train before long runs instructed."
+    },
+    {
+      "constraintId": "C24",
+      "graphRefs": [
+        "/nodes/work/prompt",
+        "/nodes/work/timerPolicy"
+      ],
+      "rationale": "Work Agent prompt states ~30 min poll intervals via hard park and early termination on plateau. timerPolicy.maxDelayMs=3600000 and maxParks=48 bound total polling."
+    },
+    {
+      "constraintId": "C25",
+      "graphRefs": [
+        "/nodes/work/prompt",
+        "/transitions/2",
+        "/transitions/0"
+      ],
+      "rationale": "Work Agent prompt contains full audit checklist. audit_pass (idx 2) only fires when audit_done==false and outcome=='pass'. error_stop catches missing F1 model/reference."
+    },
+    {
+      "constraintId": "C26",
+      "graphRefs": [
+        "/transitions/3/when",
+        "/transitions/5/when",
+        "/transitions/7/when",
+        "/transitions/9/when",
+        "/transitions/10/when",
+        "/nodes/work/prompt"
+      ],
+      "rationale": "Gate pass transitions require all independent verification flags true simultaneously, preventing any single superficial signal from advancing a phase. Gate C fail/pivot transitions each update stale_countC by exactly 1. The prompt reinforces no treating imports/loads/reward/video alone as completion."
+    },
+    {
+      "constraintId": "C27",
+      "graphRefs": [
+        "/transitions/3/when",
+        "/nodes/work/prompt",
+        "/lanes/writer/workspace/write"
+      ],
+      "rationale": "gateA_pass requires gA_smoke, gA_schema, gA_ckpt, gA_contract all true. Writer lane has atomic_replace for amp_contract.json."
+    },
+    {
+      "constraintId": "C28",
+      "graphRefs": [
+        "/transitions/5/when",
+        "/nodes/work/prompt"
+      ],
+      "rationale": "gateB_pass requires gB_replay, gB_loader, gB_isolation all true. Work prompt details retargeting verification."
+    },
+    {
+      "constraintId": "C29",
+      "graphRefs": [
+        "/transitions/7/when",
+        "/nodes/work/prompt"
+      ],
+      "rationale": "gateC_pass requires gC_walk, gC_eval, gC_sim2sim, gC_export all true. Work prompt specifies ≥60s walking, ≥95% success, ≤5% fall rate, Sim2Sim thresholds, export verification."
+    },
+    {
+      "constraintId": "C30",
+      "graphRefs": [
+        "/lanes/work/workspace/write",
+        "/nodes/work/prompt"
+      ],
+      "rationale": "Work lane has owned write on gmr_f1/ for GMR clone/adaptation. Work prompt instructs cloning GMR into gmr_f1/. Declared as blocking directory precondition."
+    },
+    {
+      "constraintId": "C31",
+      "graphRefs": [
+        "/lanes/work/workspace/read",
+        "/nodes/work/prompt",
+        "/nodes/work/tools"
+      ],
+      "rationale": "Work lane reads data/ (containing reference npz) and has bash tool for gm CLI. Prompt references gm CLI for Gradmotion."
+    },
+    {
+      "constraintId": "C32",
+      "graphRefs": [
+        "/lanes/writer/workspace/write",
+        "/nodes/commit/prompt",
+        "/nodes/work/prompt"
+      ],
+      "rationale": "Work prompt instructs recording code revision, config, data hash, seed, command, task ID to commit_payload (code_revision, dataset_revision, log_entry). Commit writes to logs and progress.json. Terminal paths write before stopping."
+    }
+  ]
+}

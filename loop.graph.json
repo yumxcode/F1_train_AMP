@@ -1,0 +1,979 @@
+{
+  "schemaVersion": "graph-2.0",
+  "id": "f1_amp_loop",
+  "version": 2,
+  "goal": "Transform F1_train_AMP from a plain PPO walking project into a fully trainable, evaluable, exportable AMP project; complete F1 walking motion retargeting and generate reliable expert locomotion data; finally train F1 to walk stably with reference gait. Progress through amp_conversion → motion_retargeting → amp_training → completed with hard gates.",
+  "state": {
+    "phase": {
+      "type": {
+        "type": "string"
+      },
+      "initial": "amp_conversion",
+      "description": "Current pipeline phase: amp_conversion | motion_retargeting | amp_training | completed"
+    },
+    "audit_done": {
+      "type": {
+        "type": "boolean"
+      },
+      "initial": false,
+      "description": "Startup repository audit completed"
+    },
+    "A_healthy": {
+      "type": {
+        "type": "boolean"
+      },
+      "initial": false,
+      "description": "Gate A passed"
+    },
+    "B_healthy": {
+      "type": {
+        "type": "boolean"
+      },
+      "initial": false,
+      "description": "Gate B passed"
+    },
+    "C_healthy": {
+      "type": {
+        "type": "boolean"
+      },
+      "initial": false,
+      "description": "Gate C passed"
+    },
+    "stale_countA": {
+      "type": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "initial": 0,
+      "description": "Consecutive Gate A failures"
+    },
+    "stale_countB": {
+      "type": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "initial": 0,
+      "description": "Consecutive Gate B failures"
+    },
+    "stale_countC": {
+      "type": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "initial": 0,
+      "description": "Consecutive Gate C failures (normal mode) or pivot failures"
+    },
+    "status_C": {
+      "type": {
+        "type": "string"
+      },
+      "initial": "normal",
+      "description": "Gate C routing status: normal | pivot_stateC | attention_required"
+    },
+    "error": {
+      "type": {
+        "type": "boolean"
+      },
+      "initial": false,
+      "description": "Unrecoverable error; loop must stop"
+    },
+    "iteration": {
+      "type": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "initial": 0,
+      "description": "Total work iterations completed"
+    }
+  },
+  "lanes": {
+    "work": {
+      "context": "persistent",
+      "maxConcurrency": 1,
+      "workspace": {
+        "read": [
+          "amp_loop.md",
+          "humanoid",
+          "resources",
+          "data",
+          "scripts",
+          "state",
+          "logs",
+          "gmr_f1",
+          ".oma",
+          "monitor_train.sh",
+          "amp_contract.json"
+        ],
+        "write": [
+          {
+            "path": "humanoid",
+            "mode": "owned"
+          },
+          {
+            "path": "scripts",
+            "mode": "owned"
+          },
+          {
+            "path": "data",
+            "mode": "owned"
+          },
+          {
+            "path": "gmr_f1",
+            "mode": "owned"
+          },
+          {
+            "path": ".oma",
+            "mode": "owned"
+          }
+        ],
+        "deny": [
+          ".git"
+        ]
+      },
+      "description": "Thick research/execution agent with full project context for AMP implementation, retargeting, and training experiments."
+    },
+    "writer": {
+      "context": "persistent",
+      "maxConcurrency": 1,
+      "workspace": {
+        "read": [
+          "state",
+          "logs",
+          "amp_contract.json"
+        ],
+        "write": [
+          {
+            "path": "state/progress.json",
+            "mode": "atomic_replace"
+          },
+          {
+            "path": "state/task_spec.md",
+            "mode": "atomic_replace"
+          },
+          {
+            "path": "state/findings.jsonl",
+            "mode": "append_only"
+          },
+          {
+            "path": "state/directions_tried.json",
+            "mode": "atomic_replace"
+          },
+          {
+            "path": "state/iteration_log.jsonl",
+            "mode": "append_only"
+          },
+          {
+            "path": "state/evaluation.json",
+            "mode": "atomic_replace"
+          },
+          {
+            "path": "amp_contract.json",
+            "mode": "atomic_replace"
+          },
+          {
+            "path": "logs/work.jsonl",
+            "mode": "append_only"
+          },
+          {
+            "path": "logs/orchestrator.jsonl",
+            "mode": "append_only"
+          }
+        ],
+        "deny": [
+          ".git"
+        ]
+      },
+      "description": "Serial state writer: exclusive owner of all state/ and logs/ file writes."
+    }
+  },
+  "nodes": {
+    "work": {
+      "type": "agent",
+      "lane": "work",
+      "prompt": "You are the sole research/execution Agent in a long-running AMP (Adversarial Motion Prior) project loop. The project root is the current working directory.\n\n## FIRST ACTION EVERY ACTIVATION\nRead state/progress.json, state/findings.jsonl, state/directions_tried.json, state/evaluation.json, and amp_loop.md to understand current progress, history, and detailed criteria.\n\n## CORE SAFETY RULES (non-negotiable)\n1. NEVER write files under state/ or logs/ — only the commit agent does that.\n2. NEVER lower acceptance thresholds or skip checks to advance a gate.\n3. Change ONE major hypothesis per experiment; keep a comparable baseline.\n4. Only set verification flags (gA_*, gB_*, gC_*) to true when you have concrete evidence.\n5. NEVER use X1/RPO data as F1; verify robot identity via audit first.\n6. NEVER treat 'code imports', 'data loads', 'reward rises', or 'video looks like walking' alone as phase completion.\n7. NEVER silently drop/zero-fill mismatched joints or reuse wrong joint order/coordinate system/physics parameters.\n8. Do not simultaneously change data, algorithm, reward, and control parameters in one experiment and claim attribution.\n\n## PHASE BEHAVIORS (select based on inputs.phase, audit_done, status_C)\n\n### Startup Audit (audit_done == false)\nAudit the repository: verify real robot identity (URDF/MJCF, DOF, actuated joints, limits, default pose, joint order, body names, foot definitions, collision bodies); verify training environment, task registration, actor/critic, runner, PPO, rollout storage, train/play/export and Sim2Sim data flow; search for AMP/motion loader/discriminator/expert replay buffer/style reward/retarget tools and expert data; list X1 naming remnants and classify naming-only vs functional issues; run baseline PPO (can it start, short train, play, Sim2Sim). If F1 model or reference walk source is genuinely missing, output outcome='error'. When audit is complete and all critical issues resolved, output outcome='pass'.\n\n### Gate A — amp_conversion (phase == 'amp_conversion')\nTransform project into a complete AMP training pipeline. Run bounded smoke train with small data/envs. Verify ALL before outputting outcome='pass':\n- gA_smoke: smoke train logs show discriminator loss, style reward, gradient penalty (independent AMP metrics)\n- gA_schema: expert/policy transition schema comparison script outputs PASS\n- gA_ckpt: checkpoint save → resume → play each executed with evidence saved\n- gA_contract: amp_contract.json generated, path written to findings\nIf any check fails, output outcome='fail'. On unrecoverable error, output outcome='error'.\n\n### Gate B — motion_retargeting (phase == 'motion_retargeting')\nClone/fork GMR (https://github.com/Roboparty/GMR) into gmr_f1/. Adapt for F1 URDF/MJCF without simplifying IK. Retarget reference walk from data/0008_normal_walk4_stageii.npz. Verify ALL before outcome='pass':\n- gB_replay: at least one clip passes MuJoCo/kinematic playback + quantitative acceptance (joint name 1:1, dimension/order match F1 task, root height/pose/orientation reasonable, no NaN/Inf jumps, foot contact timing, slip/penetration/hover/knee-reverse/self-collision within thresholds, loop continuity)\n- gB_loader: AMP loader reads retargeted data, statistics match retarget output\n- gB_isolation: unqualified clips isolated with recorded reasons, not mixed into expert dataset\nVersion-segregate original/intermediate/reordered training data.\n\n### Gate C — amp_training (phase == 'amp_training')\n\n#### status_C == 'normal'\nFIRST ENTRY: freeze eval protocol in task_spec.md (≥5 fixed seeds, command scope, terrain, domain randomization, seed values, numerical thresholds for speed/gait phase/foot slip/posture/imitation error). Never lower these.\nSelect ONE direction. Run AMP training on Gradmotion. Monitor via gm CLI (~30 min polls via hard park, max 48 parks). Record task ID, code revision, config, data hash, seed, command. On plateau: terminate early. Evaluate with fixed seeds (≥5), report mean/std/worst.\n- outcome='pass': ALL of gC_walk (≥60s continuous walking, no fall/NaN/Inf/hard-limit violation), gC_eval (batch eval success rate ≥95%, fall rate ≤5%), gC_sim2sim (Sim2Sim meets frozen thresholds), gC_export (checkpoint resume/play/export verified, obs/action contract consistent)\n- outcome='fail': result worse, invalid, or degraded\n- outcome='better': effective improvement (decrement stale count)\n\n#### status_C == 'pivot_stateC'\nResearch from opposing hypothesis. Supplement with ablation experiments or different evidence types. Study high-confidence first-party papers/official implementations, record structural differences vs current implementation. Update directions_tried.json with: old direction failure reason + how new direction differs from all tried approaches. When redesign complete, output outcome='pass'. On pivot experiment failure, output outcome='fail'.\n\n#### status_C == 'attention_required'\nWrite a comprehensive final report (all attempts, findings, recommendations) into commit_payload. Output outcome='error'.\n\n#### phase == 'completed'\nWrite final success report into commit_payload. Output outcome='pass'.\n\n## REMOTE TRAINING PROTOCOL\nUse gm CLI for Gradmotion. Smoke train before expensive long runs. On quota exhaustion: gm account-pool remove <current id>, gm account-pool get, bounded retry. Log account switches but they do not change research conclusions. Record everything to commit_payload.log_entry.\n\n## OUTPUT FORMAT (always)\n- outcome: 'init' | 'pass' | 'fail' | 'better' | 'error' | 'continue'\n- commit_payload: object with optional keys:\n  - finding: optional finding record (appended to findings.jsonl)\n  - iteration: optional iteration record (appended to iteration_log.jsonl)\n  - progress_update: optional progress fields\n  - directions: optional directions_tried.json content (atomic replace)\n  - evaluation: optional evaluation.json content (atomic replace)\n  - task_spec: optional task_spec.md content (atomic replace)\n  - amp_contract: optional amp_contract.json content (atomic replace)\n  - log_entry: optional work.jsonl + orchestrator.jsonl entries\n  - code_revision: optional string (git commit hash or version tag of current code state; included in progress.json)\n  - dataset_revision: optional string (hash or version tag of current dataset state; included in progress.json)\n- Verification flags (set only for current phase): gA_smoke, gA_schema, gA_ckpt, gA_contract, gB_replay, gB_loader, gB_isolation, gC_walk, gC_eval, gC_sim2sim, gC_export\nSet code_revision and dataset_revision whenever code or data changes in this activation. On phase transitions and error stops, always include both fields.",
+      "systemInstructions": "You are a meticulous robotics ML researcher. Always verify before claiming. Prefer concrete evidence (command output, file checks, metric values) over assumptions.",
+      "inputs": {
+        "phase": {
+          "ref": "$state.phase"
+        },
+        "audit_done": {
+          "ref": "$state.audit_done"
+        },
+        "A_healthy": {
+          "ref": "$state.A_healthy"
+        },
+        "B_healthy": {
+          "ref": "$state.B_healthy"
+        },
+        "C_healthy": {
+          "ref": "$state.C_healthy"
+        },
+        "stale_countA": {
+          "ref": "$state.stale_countA"
+        },
+        "stale_countB": {
+          "ref": "$state.stale_countB"
+        },
+        "stale_countC": {
+          "ref": "$state.stale_countC"
+        },
+        "status_C": {
+          "ref": "$state.status_C"
+        },
+        "error": {
+          "ref": "$state.error"
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": [
+          "outcome",
+          "commit_payload"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "init",
+              "pass",
+              "fail",
+              "better",
+              "error",
+              "continue"
+            ]
+          },
+          "commit_payload": {
+            "type": "object"
+          },
+          "gA_smoke": {
+            "type": "boolean"
+          },
+          "gA_schema": {
+            "type": "boolean"
+          },
+          "gA_ckpt": {
+            "type": "boolean"
+          },
+          "gA_contract": {
+            "type": "boolean"
+          },
+          "gB_replay": {
+            "type": "boolean"
+          },
+          "gB_loader": {
+            "type": "boolean"
+          },
+          "gB_isolation": {
+            "type": "boolean"
+          },
+          "gC_walk": {
+            "type": "boolean"
+          },
+          "gC_eval": {
+            "type": "boolean"
+          },
+          "gC_sim2sim": {
+            "type": "boolean"
+          },
+          "gC_export": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": true
+      },
+      "skills": [
+      "gradmotion"
+      ],
+      "tools": [
+        "read_file",
+        "write_file",
+        "edit_file",
+        "append_file",
+        "bash",
+        "glob",
+        "grep",
+        "web_fetch",
+        "skill"
+      ],
+      "maxAttempts": 3,
+      "budget": {
+        "turns": 500,
+        "usd": 250,
+        "wallTimeMs": 60000000
+      },
+      "lifetimeBudget": {
+        "turns": 5000,
+        "usd": 500,
+        "elapsedMs": 60480000000
+      },
+      "timerPolicy": {
+        "allowHardPark": true,
+        "maxDelayMs": 3600000,
+        "maxParks": 48
+      }
+    },
+    "commit": {
+      "type": "agent",
+      "lane": "writer",
+      "prompt": "You are the state_writer. Your sole job is to persist state, findings, and logs. NEVER modify files outside state/, logs/, and amp_contract.json.\n\n## INPUTS\nYou receive current graph state values (phase, audit_done, A_healthy, B_healthy, C_healthy, stale_countA, stale_countB, stale_countC, status_C, error, iteration) and commit_payload from the work agent.\n\n## DERIVED VALUES\nCompute these from inputs:\n- phase_status: derive from state: if error==true → \"error\"; if phase==\"completed\" → \"completed\"; if status_C != \"normal\" and phase==\"amp_training\" → status_C; if the corresponding X_healthy is true → \"gate_passed\"; else → \"in_progress\".\n- total_findings: count the number of lines currently in state/findings.jsonl (read the file first; if it does not exist, 0).\n\n## ACTIONS (perform ALL that apply)\n1. Write state/progress.json (atomic replace) with: {\"iteration\": <iteration>, \"phase\": <phase>, \"phase_status\": <phase_status>, \"total_findings\": <total_findings>, \"A_healthy\": <A_healthy>, \"B_healthy\": <B_healthy>, \"C_healthy\": <C_healthy>, \"stale_countA\": <stale_countA>, \"stale_countB\": <stale_countB>, \"stale_countC\": <stale_countC>, \"status_C\": <status_C>, \"error\": <error>, \"code_revision\": <commit_payload.code_revision or previous value from existing progress.json or null>, \"dataset_revision\": <commit_payload.dataset_revision or previous value from existing progress.json or null>, \"updated_at\": \"<current ISO timestamp>\"}. Always include ALL fields listed in this JSON. For code_revision and dataset_revision: if commit_payload contains them, use the new values; otherwise read the existing progress.json to carry forward the previous values; if neither exists, use null.\n2. If state/task_spec.md does NOT exist: create it with project goal and milestone placeholders. If commit_payload.task_spec exists: atomic replace state/task_spec.md with it.\n3. If state/directions_tried.json does NOT exist: create it as {\"directions\": []}. If commit_payload.directions exists: atomic replace state/directions_tried.json with it.\n4. If state/evaluation.json does NOT exist: create it as {}. If commit_payload.evaluation exists: atomic replace state/evaluation.json with it.\n5. If commit_payload.finding exists: append it as a JSON line to state/findings.jsonl.\n6. If commit_payload.iteration exists: append it as a JSON line to state/iteration_log.jsonl.\n7. If commit_payload.amp_contract exists: atomic replace amp_contract.json with it.\n8. If commit_payload.log_entry exists: append to logs/work.jsonl and logs/orchestrator.jsonl.\n9. If none of state/findings.jsonl, state/iteration_log.jsonl, logs/work.jsonl, logs/orchestrator.jsonl exist: create them as empty files.\n\nOutput {\"committed\": true}.",
+      "systemInstructions": "You are a deterministic file writer. Do not interpret research results or make routing decisions. Simply persist what you receive.",
+      "inputs": {
+        "phase": {
+          "ref": "$state.phase"
+        },
+        "audit_done": {
+          "ref": "$state.audit_done"
+        },
+        "A_healthy": {
+          "ref": "$state.A_healthy"
+        },
+        "B_healthy": {
+          "ref": "$state.B_healthy"
+        },
+        "C_healthy": {
+          "ref": "$state.C_healthy"
+        },
+        "stale_countA": {
+          "ref": "$state.stale_countA"
+        },
+        "stale_countB": {
+          "ref": "$state.stale_countB"
+        },
+        "stale_countC": {
+          "ref": "$state.stale_countC"
+        },
+        "status_C": {
+          "ref": "$state.status_C"
+        },
+        "error": {
+          "ref": "$state.error"
+        },
+        "iteration": {
+          "ref": "$state.iteration"
+        },
+        "commit_payload": {
+          "literal": null
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": [
+          "committed"
+        ],
+        "properties": {
+          "committed": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": true
+      },
+      "tools": [
+        "read_file",
+        "write_file",
+        "append_file",
+        "glob"
+      ],
+      "maxAttempts": 2,
+      "budget": {
+        "turns": 150,
+        "usd": 30,
+        "wallTimeMs": 30000000
+      }
+    },
+    "done": {
+      "type": "terminal",
+      "status": "done",
+      "result": {
+        "ref": "$input.result"
+      }
+    },
+    "failed": {
+      "type": "terminal",
+      "status": "failed",
+      "result": {
+        "ref": "$input.result"
+      }
+    }
+  },
+  "transitions": [
+    {
+      "id": "error_stop",
+      "from": "work",
+      "on": "success",
+      "when": "$output.outcome == 'error'",
+      "priority": 200,
+      "updates": [
+        {
+          "target": "error",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": true
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "attention_reported",
+      "from": "work",
+      "on": "success",
+      "when": "$state.phase == 'amp_training' && $state.status_C == 'attention_required'",
+      "priority": 195,
+      "updates": [
+        {
+          "target": "error",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": true
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "audit_pass",
+      "from": "work",
+      "on": "success",
+      "when": "$state.audit_done == false && $output.outcome == 'pass'",
+      "priority": 190,
+      "updates": [
+        {
+          "target": "audit_done",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": true
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "gateA_pass",
+      "from": "work",
+      "on": "success",
+      "when": "$state.phase == 'amp_conversion' && $state.audit_done == true && $output.outcome == 'pass' && $output.gA_smoke == true && $output.gA_schema == true && $output.gA_ckpt == true && $output.gA_contract == true",
+      "priority": 180,
+      "updates": [
+        {
+          "target": "A_healthy",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": true
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "gateA_fail",
+      "from": "work",
+      "on": "success",
+      "when": "$state.phase == 'amp_conversion' && $state.audit_done == true && $output.outcome == 'fail'",
+      "priority": 170,
+      "updates": [
+        {
+          "target": "stale_countA",
+          "reducer": "builtin/increment@1"
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "gateB_pass",
+      "from": "work",
+      "on": "success",
+      "when": "$state.phase == 'motion_retargeting' && $output.outcome == 'pass' && $output.gB_replay == true && $output.gB_loader == true && $output.gB_isolation == true",
+      "priority": 160,
+      "updates": [
+        {
+          "target": "B_healthy",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": true
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "gateB_fail",
+      "from": "work",
+      "on": "success",
+      "when": "$state.phase == 'motion_retargeting' && $output.outcome == 'fail'",
+      "priority": 150,
+      "updates": [
+        {
+          "target": "stale_countB",
+          "reducer": "builtin/increment@1"
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "gateC_pass",
+      "from": "work",
+      "on": "success",
+      "when": "$state.phase == 'amp_training' && $state.status_C == 'normal' && $output.outcome == 'pass' && $output.gC_walk == true && $output.gC_eval == true && $output.gC_sim2sim == true && $output.gC_export == true",
+      "priority": 140,
+      "updates": [
+        {
+          "target": "C_healthy",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": true
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "gateC_pivot_done",
+      "from": "work",
+      "on": "success",
+      "when": "$state.phase == 'amp_training' && $state.status_C == 'pivot_stateC' && $output.outcome == 'pass'",
+      "priority": 135,
+      "updates": [
+        {
+          "target": "stale_countC",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": 0
+            }
+          ]
+        },
+        {
+          "target": "status_C",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "normal"
+            }
+          ]
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "gateC_fail",
+      "from": "work",
+      "on": "success",
+      "when": "$state.phase == 'amp_training' && $state.status_C == 'normal' && $output.outcome == 'fail'",
+      "priority": 130,
+      "updates": [
+        {
+          "target": "stale_countC",
+          "reducer": "builtin/increment@1"
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "gateC_pivot_fail",
+      "from": "work",
+      "on": "success",
+      "when": "$state.phase == 'amp_training' && $state.status_C == 'pivot_stateC' && $output.outcome == 'fail'",
+      "priority": 128,
+      "updates": [
+        {
+          "target": "stale_countC",
+          "reducer": "builtin/increment@1"
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "gateC_better",
+      "from": "work",
+      "on": "success",
+      "when": "$state.phase == 'amp_training' && $state.status_C == 'normal' && $output.outcome == 'better' && $state.stale_countC > 0",
+      "priority": 125,
+      "updates": [
+        {
+          "target": "stale_countC",
+          "reducer": "builtin/decrement@1"
+        },
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "work_default",
+      "from": "work",
+      "on": "success",
+      "default": true,
+      "updates": [
+        {
+          "target": "iteration",
+          "reducer": "builtin/increment@1"
+        }
+      ],
+      "to": {
+        "node": "commit",
+        "inputs": {
+          "commit_payload": {
+            "ref": "$output.commit_payload"
+          }
+        }
+      }
+    },
+    {
+      "id": "stop_error",
+      "from": "commit",
+      "on": "success",
+      "when": "$state.error == true",
+      "priority": 1000,
+      "to": {
+        "node": "failed",
+        "inputs": {
+          "result": {
+            "ref": "$output"
+          }
+        }
+      }
+    },
+    {
+      "id": "stop_completed",
+      "from": "commit",
+      "on": "success",
+      "when": "$state.phase == 'completed'",
+      "priority": 990,
+      "to": {
+        "node": "done",
+        "inputs": {
+          "result": {
+            "ref": "$output"
+          }
+        }
+      }
+    },
+    {
+      "id": "advance_B",
+      "from": "commit",
+      "on": "success",
+      "when": "$state.phase == 'amp_conversion' && $state.A_healthy == true",
+      "priority": 980,
+      "updates": [
+        {
+          "target": "phase",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "motion_retargeting"
+            }
+          ]
+        }
+      ],
+      "to": "work"
+    },
+    {
+      "id": "advance_C",
+      "from": "commit",
+      "on": "success",
+      "when": "$state.phase == 'motion_retargeting' && $state.B_healthy == true",
+      "priority": 970,
+      "updates": [
+        {
+          "target": "phase",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "amp_training"
+            }
+          ]
+        }
+      ],
+      "to": "work"
+    },
+    {
+      "id": "advance_done",
+      "from": "commit",
+      "on": "success",
+      "when": "$state.phase == 'amp_training' && $state.C_healthy == true",
+      "priority": 960,
+      "updates": [
+        {
+          "target": "phase",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "completed"
+            }
+          ]
+        }
+      ],
+      "to": "work"
+    },
+    {
+      "id": "gateA_stale_stop",
+      "from": "commit",
+      "on": "success",
+      "when": "$state.phase == 'amp_conversion' && $state.stale_countA >= 10",
+      "priority": 950,
+      "updates": [
+        {
+          "target": "error",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": true
+            }
+          ]
+        }
+      ],
+      "to": "commit"
+    },
+    {
+      "id": "gateB_stale_stop",
+      "from": "commit",
+      "on": "success",
+      "when": "$state.phase == 'motion_retargeting' && $state.stale_countB >= 10",
+      "priority": 940,
+      "updates": [
+        {
+          "target": "error",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": true
+            }
+          ]
+        }
+      ],
+      "to": "commit"
+    },
+    {
+      "id": "gateC_attention",
+      "from": "commit",
+      "on": "success",
+      "when": "$state.phase == 'amp_training' && $state.stale_countC >= 4",
+      "priority": 930,
+      "updates": [
+        {
+          "target": "status_C",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "attention_required"
+            }
+          ]
+        }
+      ],
+      "to": "work"
+    },
+    {
+      "id": "gateC_pivot",
+      "from": "commit",
+      "on": "success",
+      "when": "$state.phase == 'amp_training' && $state.stale_countC >= 2 && $state.status_C == 'normal'",
+      "priority": 920,
+      "updates": [
+        {
+          "target": "status_C",
+          "reducer": "builtin/set@1",
+          "args": [
+            {
+              "literal": "pivot_stateC"
+            }
+          ]
+        }
+      ],
+      "to": "work"
+    },
+    {
+      "id": "commit_default",
+      "from": "commit",
+      "on": "success",
+      "default": true,
+      "to": "work"
+    },
+    {
+      "id": "work_failed",
+      "from": "work",
+      "on": "failure",
+      "to": {
+        "node": "failed",
+        "inputs": {
+          "result": {
+            "ref": "$output"
+          }
+        }
+      }
+    },
+    {
+      "id": "commit_failed",
+      "from": "commit",
+      "on": "failure",
+      "to": {
+        "node": "failed",
+        "inputs": {
+          "result": {
+            "ref": "$output"
+          }
+        }
+      }
+    }
+  ],
+  "entrypoints": [
+    {
+      "id": "start",
+      "node": "work"
+    }
+  ],
+  "limits": {
+    "maxTotalActivations": 300,
+    "maxLiveActivations": 1,
+    "maxWallTimeMs": 60480000000,
+    "maxCostUsd": 6000,
+    "maxFanOut": 2,
+    "maxPendingTimers": 4
+  },
+  "concurrency": {
+    "maxActivations": 1,
+    "maxPerNode": 1,
+    "stateConsistency": "commit_latest"
+  }
+}
