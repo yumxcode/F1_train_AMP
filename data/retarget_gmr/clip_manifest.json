@@ -1,0 +1,14 @@
+{
+  "clips": [
+    {
+      "name": "0008_normal_walk4_stageii_retargeted",
+      "source": "data/0008_normal_walk4_stageii.npz",
+      "status": "qualified",
+      "frames": 337,
+      "fps": 100.0,
+      "reason": "Passes all 24 quantitative checks (joint 1:1, no NaN/Inf, root height/pose reasonable, foot contact alternating, no penetration/hover/knee-reverse, loop continuity)"
+    }
+  ],
+  "disqualified": [],
+  "note": "Only one reference clip available (0008_normal_walk4). It passed all validation checks. No clips were disqualified or isolated."
+}

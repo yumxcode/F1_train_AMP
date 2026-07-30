@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "amp-contract-1.0",
+  "project": "F1_train_AMP",
+  "robot": {
+    "name": "x1",
+    "mjcf_model": "xyber_x1 (zhiyuan scene)",
+    "identity_classification": "F1 is a project codename; all functional identifiers and the single robot model are x1/xyber_x1. No F1-vs-X1 functional mismatch.",
+    "dof": 12,
+    "urdf": "resources/robots/x1/urdf/x1.urdf",
+    "mjcf": "resources/robots/x1/mjcf/xyber_x1_flat.xml",
+    "foot_name": "ankle_roll",
+    "knee_name": "knee_pitch"
+  },
+  "joint_order": {
+    "source_of_truth": "URDF dof_names == env action order == motion_lib X1_JOINT_NAMES",
+    "names": [
+      "left_hip_pitch_joint", "left_hip_roll_joint", "left_hip_yaw_joint",
+      "left_knee_pitch_joint", "left_ankle_pitch_joint", "left_ankle_roll_joint",
+      "right_hip_pitch_joint", "right_hip_roll_joint", "right_hip_yaw_joint",
+      "right_knee_pitch_joint", "right_ankle_pitch_joint", "right_ankle_roll_joint"
+    ]
+  },
+  "joint_limits_rad": {
+    "source": "cfg.safety.manual_joint_clip == motion_lib.X1_JOINT_LIMITS",
+    "lower": [-0.90, -0.35, -0.45, 0.00, -0.55, -0.30, -0.90, -0.35, -0.45, 0.00, -0.55, -0.30],
+    "upper": [0.70, 0.35, 0.45, 1.45, 0.45, 0.30, 0.70, 0.35, 0.45, 1.45, 0.45, 0.30]
+  },
+  "default_dof_pos_rad": [0.4, 0.05, -0.31, 0.49, -0.21, 0.0, -0.4, -0.05, 0.31, 0.49, -0.21, 0.0],
+  "amp_obs": {
+    "total_dim": 35,
+    "expert_policy_parity": "expert (MotionLib.build_amp_obs_numpy) and policy (X1AMPEnv.compute_amp_obs) use ONE identical feature layout; all quantities in base frame.",
+    "blocks": {
+      "base_lin_vel": [0, 3],
+      "base_ang_vel": [3, 6],
+      "projected_gravity": [6, 9],
+      "dof_pos_rel": [9, 21],
+      "dof_vel": [21, 33],
+      "foot_contact": [33, 35]
+    },
+    "foot_contact_source": "policy: contact_forces[feet_indices,2] > 5.0; expert: clip foot_contact column or height-based fallback"
+  },
+  "discriminator": {
+    "input_dim": 35,
+    "hidden_dims": [1024, 512],
+    "lr": 1e-4,
+    "grad_penalty_coef": 5.0,
+    "train_iters_per_ppo": 2,
+    "batch_size": 4096,
+    "style_weight": 1.0,
+    "style_reward": "r = clamp(1 - 0.25*(ema(D(expert)) - D(policy)), 0, 2); correct sign (rises as policy logit -> expert)"
+  },
+  "training_state_resume": {
+    "checkpoint_keys": ["model_state_dict", "optimizer_state_dict", "es_optimizer_state_dict", "disc_state_dict", "disc_optimizer_state_dict", "expert_logit_ema", "policy_amp_buffer_state", "iter"],
+    "note": "policy replay buffer contents intentionally NOT persisted (transient reservoir); restored empty to avoid all-zero-sample corruption."
+  },
+  "expert_data": {
+    "gateA_smoke_clip": "data/smoke_expert/walk_smoke.npz (SYNTHETIC X1-space clip; regenerable via humanoid/scripts/gen_smoke_expert.py; NOT the real retargeted expert)",
+    "gateB_target_clip": "data/retarget_gmr/x1_walk_retargeted.npz (produced by Gate B GMR retargeting; absent until Gate B passes)",
+    "reference_walk_source": "data/0008_normal_walk4_stageii.npz (BMLrub/SMPL-X human mocap, 405 frames) - raw source for retargeting"
+  },
+  "verification_commands": {
+    "schema_headless": "python humanoid/scripts/test_amp_contract.py",
+    "algo_smoke_headless": "python humanoid/scripts/amp_algo_smoke_numpy.py",
+    "config_resolve_headless": "python humanoid/scripts/check_amp_runner_config.py",
+    "amp_smoke_isaac": "gm-run F1_train_AMP/humanoid/scripts/smoke_amp.py --headless",
+    "baseline_smoke_isaac": "gm-run F1_train_AMP/humanoid/scripts/smoke_baseline.py --headless"
+  },
+  "verification_results": {
+    "schema_headless": {"status": "PASS", "checks_pass": "21/21", "report": "data/smoke_expert/contract_test_report.txt", "amp_obs_dim": 35, "expert_samples": 299, "resampled_fps": 100.0},
+    "algo_smoke_headless": {"status": "PASS", "checks_pass": "10/10", "disc_loss": "4.354->0.063", "acc_final": 1.0, "style_reward_expert": 0.987, "style_reward_fake": 0.004, "sign_correct": true},
+    "config_resolve_headless": {"status": "PASS", "checks_pass": "4/4"},
+    "amp_smoke_isaac": {
+      "status": "PASS",
+      "gradmotion_task": "TASK_20260730_028",
+      "image": "BJX00000001/V000124",
+      "goods": "ESKU000001",
+      "code": "origin/amp-gateA-smoke@82c31e0",
+      "runner_init": "disc_input_dim=35 style_weight=1.0 expert_clips=1 expert_samples=299",
+      "amp_metrics_trajectory": [
+        "iter=0 disc_loss=1.4631 gp=0.0145 style_r=1.0805 acc=0.565 e_logit=-0.168 p_logit=-0.235",
+        "iter=1 disc_loss=1.3930 gp=0.0091 style_r=1.0324 acc=0.514 e_logit=0.501 p_logit=0.329",
+        "iter=2 disc_loss=1.3122 gp=0.0073 style_r=0.9311 acc=0.684 e_logit=0.312 p_logit=0.051",
+        "iter=3 disc_loss=1.3179 gp=0.0101 style_r=0.8976 acc=0.719 e_logit=0.008 p_logit=-0.261",
+        "iter=4 disc_loss=1.3042 gp=0.0138 style_r=0.9278 acc=0.729 e_logit=0.005 p_logit=-0.347"
+      ],
+      "dynamics": "disc_loss decreases 1.4631->1.3042; gp bounded 0.0073-0.0145; style_r present & bounded; acc rises 0.565->0.729; expert/policy logits separate",
+      "checkpoint_resume_play": {"ckpt_saved": true, "resume_keys_ok": true, "disc_state_match": true, "ema_match": true, "ema_ckpt": 0.029329, "play_ok": true, "disc_param_mean_delta": "3.498e-04", "finite": true}
+    }
+  }
+}

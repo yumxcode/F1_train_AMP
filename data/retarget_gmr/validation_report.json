@@ -1,0 +1,138 @@
+{
+  "checks": [
+    {
+      "name": "joint_names 1:1 with X1 task",
+      "pass": true,
+      "detail": "['left_hip_pitch', 'left_hip_roll', 'left_hip_yaw', 'left_knee_pitch', 'left_ankle_pitch', 'left_ankle_roll', 'right_hip_pitch', 'right_hip_roll', 'right_hip_yaw', 'right_knee_pitch', 'right_ankle_pitch', 'right_ankle_roll']"
+    },
+    {
+      "name": "joint dim == 12",
+      "pass": true,
+      "detail": "shape=(337, 12)"
+    },
+    {
+      "name": "root_translation shape (N,3)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "root_rotation shape (N,4)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no NaN/Inf in root_pos",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no NaN/Inf in root_rot",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no NaN/Inf in dof_pos",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "root height > 0.3m",
+      "pass": true,
+      "detail": "min_z=0.573"
+    },
+    {
+      "name": "root height < 1.0m",
+      "pass": true,
+      "detail": "max_z=0.637"
+    },
+    {
+      "name": "root height variation < 0.2m",
+      "pass": true,
+      "detail": "range=0.064"
+    },
+    {
+      "name": "forward progress > 0",
+      "pass": true,
+      "detail": "dist=3.05m speed=0.91m/s"
+    },
+    {
+      "name": "avg speed 0.1-1.0 m/s",
+      "pass": true,
+      "detail": "speed=0.91m/s"
+    },
+    {
+      "name": "lateral drift < 0.5m",
+      "pass": true,
+      "detail": "drift=0.004m"
+    },
+    {
+      "name": "max joint velocity < 30 rad/s",
+      "pass": true,
+      "detail": "max_vel=9.1rad/s"
+    },
+    {
+      "name": "left knee not reversed (>-0.1)",
+      "pass": true,
+      "detail": "min=-0.000"
+    },
+    {
+      "name": "right knee not reversed (>-0.1)",
+      "pass": true,
+      "detail": "min=0.000"
+    },
+    {
+      "name": "foot penetration < 5% frames",
+      "pass": true,
+      "detail": "penetration_frames=0/337"
+    },
+    {
+      "name": "left foot clearance > 0.02m",
+      "pass": true,
+      "detail": "clearance=0.112m min=0.020 max=0.132"
+    },
+    {
+      "name": "right foot clearance > 0.02m",
+      "pass": true,
+      "detail": "clearance=0.108m min=0.020 max=0.128"
+    },
+    {
+      "name": "no extended double-float (< 10% frames)",
+      "pass": true,
+      "detail": "double_float_frames=0/337"
+    },
+    {
+      "name": "knee above ground (> 0.05m)",
+      "pass": true,
+      "detail": "min_knee_z=0.305"
+    },
+    {
+      "name": "loop joint continuity (dof diff < 1.0 rad)",
+      "pass": true,
+      "detail": "max_dof_diff=0.635"
+    },
+    {
+      "name": "both feet have contact frames",
+      "pass": true,
+      "detail": "contact_sum=[232. 257.]"
+    },
+    {
+      "name": "not always double-support (< 90%)",
+      "pass": true,
+      "detail": "double_support_frames=152/337"
+    }
+  ],
+  "pass": true,
+  "summary": {
+    "frames": 337,
+    "fps": 100.0,
+    "duration_s": 3.37,
+    "avg_speed": 0.9058805315444258,
+    "total_distance": 3.052817391304715,
+    "root_z_range": [
+      0.5728776807179133,
+      0.6372105367130141
+    ],
+    "n_pass": 24,
+    "n_total": 24
+  }
+}
