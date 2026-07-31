@@ -303,6 +303,13 @@ def main():
                 "worst": float(vals.max() if hi else vals.min()) if vals.size else float("nan")}
 
     n_ok = sum(1 for sd in EVAL_SEEDS if all_results[sd] is not None)
+    vx_err_agg = agg("vx_err")
+    speed_tracking_pct = {
+        "mean": float((1.0 - vx_err_agg["mean"] / NOMINAL_VX) * 100.0),
+        "worst": float((1.0 - vx_err_agg["worst"] / NOMINAL_VX) * 100.0),
+        "target_pct": 85.0,
+        "formula": "(1 - |vx_actual - vx_cmd| / vx_cmd) * 100",
+    }
     report = {
         "task": name, "train_seed": int(args.seed), "train_max_iter": max_iter,
         "eval_seeds": EVAL_SEEDS, "episodes_per_seed": EVAL_EPISODES,
@@ -310,7 +317,9 @@ def main():
         "seeds_completed": n_ok, "seeds_total": len(EVAL_SEEDS),
         "log_dir": log_dir,
         "fall_rate": agg("fall"), "episode_length_steps": agg("ep_len"),
-        "vx_track_err_mps": agg("vx_err"), "base_height_m": agg("base_h"),
+        "vx_track_err_mps": vx_err_agg,
+        "speed_tracking_pct": speed_tracking_pct,
+        "base_height_m": agg("base_h"),
         "base_pitch_deg": agg("pitch"), "joint_pos_err_ref_rad": agg("jp_err"),
         "joint_pos_err_analytic_rad": agg("jp_err_analytic"),
         "lateral_drift_m": agg("lateral_drift"), "yaw_drift_deg": agg("yaw_drift"),
@@ -324,6 +333,7 @@ def main():
     print(f"  seeds_completed={n_ok}/{len(EVAL_SEEDS)} "
           f"fall_rate={report['fall_rate']['mean']:.3f} "
           f"vx_err={report['vx_track_err_mps']['mean']:.3f} "
+          f"speed_tracking={speed_tracking_pct['mean']:.1f}% (worst={speed_tracking_pct['worst']:.1f}%) "
           f"jp_err(expert)={report['joint_pos_err_ref_rad']['mean']:.3f} "
           f"jp_err(analytic)={report['joint_pos_err_analytic_rad']['mean']:.3f} "
           f"base_h={report['base_height_m']['mean']:.3f} "

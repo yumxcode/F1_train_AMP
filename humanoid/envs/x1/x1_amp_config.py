@@ -27,13 +27,10 @@ class X1AMPCfg(X1DHStandCfg):
         limit_damping_gain = 80.0    # increased from 50 (stronger damping near limits)
 
     class rewards(X1DHStandCfg.rewards):
-        # Keep the task reward (gait/velocity) but down-weight tracking slightly so the
-        # style reward (added by the AMP runner) has room to shape the motion.
+        # Keep task reward strong enough for 85%+ speed tracking.
         class scales(X1DHStandCfg.rewards.scales):
-            tracking_lin_vel = 1.5   # 2.5 -> 1.5 (style reward now contributes)
+            tracking_lin_vel = 2.0   # 1.5 -> 2.0: restore for 85% speed tracking target
             ref_joint_pos = 0.3     # 0.6 -> 0.3
-            # dof_pos_limits scale stays at -10 (the -30 experiment, iter-15, degraded vx tracking
-            # without sufficiently reducing violations; hard termination handles safety instead)
 
 
 class X1AMPCfgPPO(X1DHStandCfgPPO):
@@ -57,10 +54,12 @@ class X1AMPCfgPPO(X1DHStandCfgPPO):
     class amp:
         # Discriminator feature contract (must equal MotionLib.AMP_OBS_DIM == 35).
         disc_input_dim = AMP_OBS_DIM
-        disc_hidden_dims = [1024, 512]
-        disc_lr = 5e-5               # 1e-4 -> 5e-5: slow discriminator to prevent domination
-        disc_grad_penalty_coef = 5.0
-        disc_train_iters = 1         # 2 -> 1: fewer disc updates per PPO iter (anti-domination)
+        # v2 anti-domination: spectral norm + symmetric GP + label smoothing + reduced capacity
+        disc_hidden_dims = [512, 256]   # was [1024, 512] — over-parameterized for 35-dim input
+        disc_lr = 5e-5
+        disc_grad_penalty_coef = 10.0   # was 5.0 — symmetric R1 on both expert+policy
+        disc_label_smoothing = 0.1     # soft labels prevent logit saturation
+        disc_train_iters = 1
         disc_batch_size = 4096
         # Style reward mixing.
         style_weight = 1.0
@@ -68,9 +67,7 @@ class X1AMPCfgPPO(X1DHStandCfgPPO):
         expert_logit_ema_init = 0.0
         # Policy transition replay buffer.
         policy_buffer_capacity = 1_000_000
-        # Expert motion clips. Real training (amp_training) uses the Gate-B validated
-        # GMR retargeted clip (https://github.com/Roboparty/GMR methodology).
-        # The synthetic smoke clip remains available for Gate-A smoke.
+        # Expert motion clips (Gate-B validated GMR retargeted clip).
         expert_clip_paths = [
             "{LEGGED_GYM_ROOT_DIR}/data/retarget_gmr/x1_walk_retargeted.npz",
         ]
