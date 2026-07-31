@@ -1,0 +1,41 @@
+{
+  "domain": "general",
+  "tags": [
+    "motion-retargeting",
+    "gait-synthesis-vs-retarget",
+    "amp-reference",
+    "validation-gate",
+    "ik-tracking",
+    "foot-sliding",
+    "frozen-joints",
+    "gradmotion"
+  ],
+  "difficulty": "medium",
+  "title": "重定向产物实为\"过程式步态合成\"+自带验证 pass:false 仍欲放行",
+  "problem": "动作重定向阶段：脚本 scripts/retarget_smplx_to_x1.py 把参考动作 0008_normal_walk4（AMASS SMPLX 数据）经 extract_gait_params 仅提取 ~6 个标量（cadence/step_len/clearance/duty/walk_speed），再由 generate_walking_gait 用常速骨盆+贝塞尔摆动腿重新合成一个全新步态，逐帧参考运动与真实接触时序被丢弃；随后 mink IK（仅 3 个 FrameTask：骨盆+两踝位置、每帧从 home_default 冷启动、无足姿态/髋偏航任务）拟合到 X1。产出的 data/retarget_gmr/x1_walk_retargeted.npz 自带 validation_report.json 显示 pass:false（右膝 range 0.15 vs 左 1.06；3 关节冻结 L_hy/L_ap/R_ap；逐帧跳 0.602rad；足滑移 0.25m；65% 帧双脚悬空），而 checkpoint 的 pendingTodos 仍计划\"push ",
+  "solution": "1) 不要用\"过程式步态合成\"冒充\"动作重定向\"：目标要求\"左右脚接触时序与参考动作相符\"，合成步态的接触时序来自 duty 标量而非参考，结构性无法满足，也丢失了 AMP 判别器所需的参考风格。要么做真·逐帧重定向（SMPLX 全关节 FK→X1 IK，保留真实接触时序；源已是 AMASS npz 含 trans/pose_body/root_orient/betas），要么就合成步态是否可替代明确取得用户许可，不得静默替换。2) 验证报告 pass:false 是\"放行闸门\"不是\"清单勾选\"——目标明确\"应固定在阈值内才可放行、穿地从严\"；足滑移/悬空/膝反折/冻结关节/逐帧跳任一不过，禁止 push 与建训练任务。3) 稀疏 IK 必须修：补足姿态任务与髋偏航/踝任务（3 个冻结关节即欠驱动证据），逐帧用上一帧解热启动而非冷重启（消除 0.6rad 跳），并强制左右对称（右膝 range 0.15 vs 左 1.06）——呼应已有经验\"结构合法≠语义正确，须用对称+关节是否真动校验\"。",
+  "outcome": {
+    "success": false,
+    "summary": "重定向产物方法错（合成非重定向）且验证 pass:false，须先修方法+IK 并以 pass:true 过严格穿地/滑移/悬空闸门，方可进入 AMP。",
+    "failureReason": "方法层：用过程式合成替代逐帧重定向，丢弃参考的真实接触时序与风格；执行层：稀疏 IK 致 3 关节冻结+逐帧跳+足滑移+65%悬空，自带验证 pass:false 仍计划放行训练。",
+    "workarounds": [
+      "真·逐帧重定向：源 AMASS npz 全关节 FK→X1 IK，保留真实接触时序",
+      "稀疏 IK 补足姿态/髋偏航/踝任务并逐帧热启动，消除冻结关节与逐帧跳",
+      "pass:false 不得进入 push/AMP；穿地从严单独卡阈值",
+      "对比 git 历史 16d6b252 已验证 clip(24/24+6/8) 是否可恢复，避免用更差方法重做"
+    ]
+  },
+  "abstractPrinciple": "\"重定向\"≠\"用参考的若干统计量重新合成步态\"；且验证报告 pass:false 必须阻断下游（push/训练），它是闸门而非清单项。",
+  "confidenceTier": "observed",
+  "evidenceRefs": [
+    "source: data/retarget_gmr/validation_report.json: line134 \"pass\":false（右膝 range=0.150、no_joint_jumps 0.602rad/frame、frozen L_hy/L_ap/R_ap、足滑移 0.2507m/0.2484m、no_suspension 65%）；scripts/retarget_smplx_to_x1.py:80-86 extract_gait_params 仅返回 6 标量 + :89-172 generate_walking_gait 贝塞尔合成步态（确认非逐帧重定向）。",
+    "data/retarget_gmr/validation_report.json: pass=false, 6 项不通过",
+    "scripts/retarget_smplx_to_x1.py:37-172 合成而非重定向",
+    "checkpoint pendingTodos: push code/create AMP task 排在 validate 之后"
+  ],
+  "sourceSessionId": "4e1915a3-66ea-469c-9845-50315d7ac52b",
+  "id": "exp_ms8kbeue_9b0550d4",
+  "schemaVersion": "1.0",
+  "createdAt": 1785479369702,
+  "updatedAt": 1785479369702
+}

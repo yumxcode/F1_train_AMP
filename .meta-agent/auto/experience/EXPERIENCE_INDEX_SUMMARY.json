@@ -1,0 +1,214 @@
+{
+  "schemaVersion": "1.0",
+  "updatedAt": 1785485941858,
+  "total": 5,
+  "failures": 4,
+  "domainCounts": {
+    "general": 5
+  },
+  "latest": [
+    {
+      "domain": "general",
+      "tags": [
+        "amp",
+        "discriminator-domination",
+        "style-reward-collapse",
+        "gate-c",
+        "gradmotion",
+        "silent-failure",
+        "metric-misread",
+        "locomotion"
+      ],
+      "difficulty": "medium",
+      "title": "完全被支配的 AMP 判别器(acc=1.0/style_r≈0)被当 PASS：style_r 仅被 exp-floor 掩盖而非修复",
+      "problem": "Gate C AMP 训练（gradmotion TASK_20260731_103，2000 iter）的最终判别器指标为 disc_accuracy=1.0、style_reward=0.0355、e_logit=7.66/p_logit=-5.69、disc_loss=0.014。实测 gradmotion 日志逐 iter 均显示 acc=1.000、style_r 在 0.0353–0.0362 完全恒定（iter 1912–1938+）。这典型属于判别器完全支配/风格奖励坍缩——判别器 100% 区分策略与专家、几乎不给任何模仿梯度。但 checkpoint 的 progress.json 与 train_eval_report.json 仅因速度跟随 86.4%/0 跌倒/2401 步达标即判 Gate C PASS，并在 gateA 证据里声称 commit 427345e5 已\"fix AMP discriminator domination\"。",
+      "solution": "判 AMP 健康度不能用\"style_r 是否被 floor 住(>0)\"作为 PASS 准则；健康 AMP 的 disc_accuracy 应在 0.5–0.75 间波动且远低于 1.0，style_r 应为有意义正值且随策略变化而响应。修复\"支配\"必须真正打破判别器饱和（降判别器容量/学习率/更新频率，加 gradient penalty / spectral norm / label smoothing / instance noise），让 acc 回落到 <1.0、style_r 响应起来；而不是仅给 style_r 加 exp 下限地板。放行前应额外确认策略确实在模仿重定向后的参考步态（姿态/接触时序相似度），不能只看速度跟随数字。gateA 的 PASS 条件需从\"style_r bounded\"升级为\"disc_accuracy 未饱和 + style_r 响应\"。",
+      "outcome": {
+        "success": false,
+        "summary": "判别器 acc=1.0、style_r≈0 全程恒定证明 AMP 判别器被完全支配，style_r 只被 exp-floor 掩盖而未修复；不应据速度跟随数字判 Gate C PASS，需先打破判别器饱和并验证真实步态模仿。",
+        "failureReason": "判别器完全饱和(acc=1.0)：判别器 100% 区分策略与专家，给策略的模仿梯度几乎为零；style_reward 长期恒定≈0.035 说明判别器对策略行为无响应。gateA 的修复仅给 style_r 加 exp 下限地板(exp reward \"never collapses to 0\")并微降 disc_lr/disc_train_iters，只是把坍缩症状掩盖成一个小常数，并未打破判别器支配，故 1900+ iter 后判别器仍 100% 准确。结果策略几乎完全靠手写奖励(tracking_lin_vel/feet_clearance 等)训练，重定向专家动作的风格未被模仿。",
+        "workarounds": [
+          "放行 AMP 前检查 disc_accuracy<1.0(目标 0.5–0.75)且 style_r 跨 iter 有响应波动，而非仅 style_r>0",
+          "打破判别器饱和：降容量/lr/更新频率，加 gradient penalty/spectral norm/label smoothing/instance noise",
+          "除速度跟随数字外，额外校验策略对参考步态的姿态与接触时序相似度",
+          "把 gateA PASS 准则从'style_r bounded'升级为'disc 未饱和 + style_r 响应'"
+        ]
+      },
+      "abstractPrinciple": "健康 AMP 的判别器必须处于对抗均衡(acc 远低于 1.0、style_r 响应)，而非仅靠地板函数把 style_r 撑在 0 以上；\"风格奖励有数值\"≠\"风格模仿在工作\"。",
+      "confidenceTier": "observed",
+      "evidenceRefs": [
+        "source: gradmotion 任务 TASK_20260731_103 实时日志（gm task logs）：iter 1912–1938+ 每 iter 均报 acc=1.000、style_r=0.0353–0.0362 恒定、e_logit≈7.6–7.8/p_logit≈-5.66–-5.69；data/amp_eval/train_eval_report.json final_amp_metrics disc_accuracy=1.0/style_reward=0.0355；与 commit 427345e5声称\"fix AMP discriminator domination\"及 progress.json gateA\"style_r bounded PASS\"直接矛盾。",
+        "gm task logs TASK_20260731_103: iter=1912 disc_loss=0.0141 style_r=0.0362 acc=1.000 e_logit=7.599 p_logit=-5.663；iter=1938 acc=1.000 style_r=0.0355（全程恒定）",
+        "data/amp_eval/train_eval_report.json: disc_accuracy=1.0, expert_logit=7.760, policy_logit=-5.694, style_reward=0.0355, disc_loss=0.0140",
+        "commit 427345e5: '[gateC-iter2] fix AMP discriminator domination: exp reward (never collapses to 0), disc_lr 1e-4->5e-5, disc_train_iters 2->1'",
+        "state/progress.json gateA.evidence: 'disc_loss 1.52->1.40, style_r bounded' 判 PASS"
+      ],
+      "sourceSessionId": "46f99326-da79-4adb-99ca-a3b0ccd9e1c7",
+      "id": "exp_ms8o89y7_46c3ecd6",
+      "schemaVersion": "1.0",
+      "createdAt": 1785485941855,
+      "updatedAt": 1785485941855
+    },
+    {
+      "domain": "general",
+      "tags": [
+        "context-reset",
+        "load-state",
+        "phase-regression",
+        "amp-loop",
+        "retargeting",
+        "gradmotion",
+        "state-persistence"
+      ],
+      "difficulty": "medium",
+      "title": "上下文重置后未执行 load_state 导致阶段回退：重做已验收的 Gate B 重定向、遗弃在飞训练任务",
+      "problem": "长周期自主任务（F1 AMP 行走）的 turn-140 checkpoint 显示 Gate B 重定向已通过（GMR 微分 IK，24/24+MuJoCo 0穿透/0滑移/0悬空，clip manifest 诚实标注 non-loopable），Gate A 已提交，Gate C 已进入 AMP 训练迭代（iter22-25），并在 gradmotion 创建了在飞训练任务 TASK_20260731_103。但该 run 被 cancelled_by_user，新 run 从 turn=30 重新启动后 completedSteps=[]、artifacts=[]，重新规划\"从零重写 retargeting\"，且 state/ 目录为空（无 progress.json）。原因是新 run 没有执行 amp_loop.md §7 的 load_state 节点去读取 checkpoint/git 历史/已存在产物，直接退化为\"phase1=重定向\"默认假设。",
+      "solution": "每次 run 启动（尤其 context 重置/compaction/cancel 后）必须先强制执行 load_state：(1) 读 .meta-agent/auto/checkpoints/*.json 取最近一次 turnCount 最高的 checkpoint，恢复 completedSteps/pendingTodos/phase；(2) `git log --oneline` 扫一遍 gateA/gateB/gateC 提交；(3) 用 find 核对已存在产物（data/retarget_gmr/x1_walk_retargeted.npz + validation_report.json + clip_manifest.json）是否仍有效。只有\"现有产物确实缺失/损坏或 Gate B 验证 fail\"才允许重做重定向。恢复后必须填充 state/progress.json（phase + code/data revision + Gate 证据），使后续重置不再丢阶段。优先恢复并监控在飞的 gradmotion 远端训练任务，而非重做已验收数据。",
+      "outcome": {
+        "success": false,
+        "summary": "上下文重置后未 load_state，导致回退重做已验收 Gate B 并遗弃在飞 gradmotion 训练；应恢复 phase=GATE_C 并监控训练，而非重做重定向。",
+        "failureReason": "未执行 load_state：新 run 未读 turn-140 checkpoint（Gate B PASS、TASK_20260731_103 在飞）与 git 历史，state/ 为空无 phase 持久化，导致默认\"从零做重定向\"，且工作脚本 retarget_x1.py 本就已实现所谓\"待修复项\"（ankle_roll_link L240、四元数 Z-up/wxyz L223-225、orientation_cost L91、左右 swap）。",
+        "workarounds": [
+          "启动即执行 load_state：读最高 turnCount checkpoint + git log --oneline 过滤 gateA/B/C + find 核对 npz/validation_report 完整性",
+          "填充 state/progress.json 记录 phase=amp_training 及 Gate A/B 证据，避免再次回退",
+          "重做重定向前必须给出 Gate B 现有 clip 的具体失败项；无失败则直接进入 Gate C 监控 gradmotion 任务"
+        ]
+      },
+      "abstractPrinciple": "长周期任务在 context 重置后，规划前必须先 load_state（checkpoint+git log+产物核对）恢复 phase；否则会回退到重做已验收阶段、遗弃在飞远端训练任务。state/ 持久化是防回退的关键。",
+      "confidenceTier": "observed",
+      "evidenceRefs": [
+        "source: turn-140 checkpoint(4e1915a3) 明确 Gate B PASS + TASK_20260731_103 在飞，而 turn-30 checkpoint(46f99326) completedSteps=[] 且 pendingTodos 为\"重写 retargeting/修复 IK/重新生成 npz\"；git log 确认 Gate A/B/C 均已提交；retarget_x1.py 已实现 redo 计划声称要修复的全部项；state/ 为空。三者矛盾=上下文重置导致阶段回退。",
+        ".meta-agent/auto/checkpoints/4e1915a3-66ea-469c-9845-50315d7ac52b.json turn=140 completedSteps 含 'Gate B validation ... ALL PASS'、note 提 TASK_20260731_103 在飞",
+        ".meta-agent/auto/checkpoints/46f99326-da79-4adb-99ca-a3b0ccd9e1c7.json turn=30 completedSteps=[] 且 pendingTodos 全为重做重定向",
+        "git log: e9109dfb [gateB] recovered validated retargeted clip (24/24+6/8 PASS): 0 penetration,0 sliding,0 suspension; c65d6474 [gateA] PASS; 427345e5 [gateC-iter2]",
+        "gmr_f1/retarget_x1.py:240 foot_bodies=[left/right_ankle_roll_link]; :223-225 mujoco quat wxyz->xyzw; :91 orientation_cost; :112-136 rot_offsets+swap —— 已实现 redo 计划的全部待修项",
+        "state/ 目录为空（无 progress.json），phase 未持久化",
+        "data/retarget_gmr/x1_walk_retargeted.npz 完好：(337,12) 全 finite，validation_report 24/24 PASS"
+      ],
+      "sourceSessionId": "46f99326-da79-4adb-99ca-a3b0ccd9e1c7",
+      "id": "exp_ms8lw71j_f203a051",
+      "schemaVersion": "1.0",
+      "createdAt": 1785482018983,
+      "updatedAt": 1785482018983
+    },
+    {
+      "domain": "general",
+      "tags": [
+        "motion-retargeting",
+        "gait-synthesis-vs-retarget",
+        "amp-reference",
+        "validation-gate",
+        "ik-tracking",
+        "foot-sliding",
+        "frozen-joints",
+        "gradmotion"
+      ],
+      "difficulty": "medium",
+      "title": "重定向产物实为\"过程式步态合成\"+自带验证 pass:false 仍欲放行",
+      "problem": "动作重定向阶段：脚本 scripts/retarget_smplx_to_x1.py 把参考动作 0008_normal_walk4（AMASS SMPLX 数据）经 extract_gait_params 仅提取 ~6 个标量（cadence/step_len/clearance/duty/walk_speed），再由 generate_walking_gait 用常速骨盆+贝塞尔摆动腿重新合成一个全新步态，逐帧参考运动与真实接触时序被丢弃；随后 mink IK（仅 3 个 FrameTask：骨盆+两踝位置、每帧从 home_default 冷启动、无足姿态/髋偏航任务）拟合到 X1。产出的 data/retarget_gmr/x1_walk_retargeted.npz 自带 validation_report.json 显示 pass:false（右膝 range 0.15 vs 左 1.06；3 关节冻结 L_hy/L_ap/R_ap；逐帧跳 0.602rad；足滑移 0.25m；65% 帧双脚悬空），而 checkpoint 的 pendingTodos 仍计划\"push ",
+      "solution": "1) 不要用\"过程式步态合成\"冒充\"动作重定向\"：目标要求\"左右脚接触时序与参考动作相符\"，合成步态的接触时序来自 duty 标量而非参考，结构性无法满足，也丢失了 AMP 判别器所需的参考风格。要么做真·逐帧重定向（SMPLX 全关节 FK→X1 IK，保留真实接触时序；源已是 AMASS npz 含 trans/pose_body/root_orient/betas），要么就合成步态是否可替代明确取得用户许可，不得静默替换。2) 验证报告 pass:false 是\"放行闸门\"不是\"清单勾选\"——目标明确\"应固定在阈值内才可放行、穿地从严\"；足滑移/悬空/膝反折/冻结关节/逐帧跳任一不过，禁止 push 与建训练任务。3) 稀疏 IK 必须修：补足姿态任务与髋偏航/踝任务（3 个冻结关节即欠驱动证据），逐帧用上一帧解热启动而非冷重启（消除 0.6rad 跳），并强制左右对称（右膝 range 0.15 vs 左 1.06）——呼应已有经验\"结构合法≠语义正确，须用对称+关节是否真动校验\"。",
+      "outcome": {
+        "success": false,
+        "summary": "重定向产物方法错（合成非重定向）且验证 pass:false，须先修方法+IK 并以 pass:true 过严格穿地/滑移/悬空闸门，方可进入 AMP。",
+        "failureReason": "方法层：用过程式合成替代逐帧重定向，丢弃参考的真实接触时序与风格；执行层：稀疏 IK 致 3 关节冻结+逐帧跳+足滑移+65%悬空，自带验证 pass:false 仍计划放行训练。",
+        "workarounds": [
+          "真·逐帧重定向：源 AMASS npz 全关节 FK→X1 IK，保留真实接触时序",
+          "稀疏 IK 补足姿态/髋偏航/踝任务并逐帧热启动，消除冻结关节与逐帧跳",
+          "pass:false 不得进入 push/AMP；穿地从严单独卡阈值",
+          "对比 git 历史 16d6b252 已验证 clip(24/24+6/8) 是否可恢复，避免用更差方法重做"
+        ]
+      },
+      "abstractPrinciple": "\"重定向\"≠\"用参考的若干统计量重新合成步态\"；且验证报告 pass:false 必须阻断下游（push/训练），它是闸门而非清单项。",
+      "confidenceTier": "observed",
+      "evidenceRefs": [
+        "source: data/retarget_gmr/validation_report.json: line134 \"pass\":false（右膝 range=0.150、no_joint_jumps 0.602rad/frame、frozen L_hy/L_ap/R_ap、足滑移 0.2507m/0.2484m、no_suspension 65%）；scripts/retarget_smplx_to_x1.py:80-86 extract_gait_params 仅返回 6 标量 + :89-172 generate_walking_gait 贝塞尔合成步态（确认非逐帧重定向）。",
+        "data/retarget_gmr/validation_report.json: pass=false, 6 项不通过",
+        "scripts/retarget_smplx_to_x1.py:37-172 合成而非重定向",
+        "checkpoint pendingTodos: push code/create AMP task 排在 validate 之后"
+      ],
+      "sourceSessionId": "4e1915a3-66ea-469c-9845-50315d7ac52b",
+      "id": "exp_ms8kbeue_9b0550d4",
+      "schemaVersion": "1.0",
+      "createdAt": 1785479369702,
+      "updatedAt": 1785479369702
+    },
+    {
+      "domain": "general",
+      "tags": [
+        "retargeting",
+        "ik",
+        "silent-failure",
+        "gate-b",
+        "validation",
+        "x1",
+        "amp"
+      ],
+      "difficulty": "medium",
+      "title": "IK 重定向关节名拼写错致约束静默丢失：输出\"格式合法但无步态\"",
+      "problem": "用 GMR IK 把 SMPLX 行走动作重定向到 X1，输出 NPZ 格式合法（无 NaN/Inf、形状正确、12 关节名齐全），但实测 12 关节中 7 个完全冻结（std=0.000 停在初值）、右膝活动范围仅 0.18（左膝 0.70）、左脚全程无接触（foot_contact 左列均值=0.0），不是有效行走步态。若只按 NaN/形状校验即放行，会把\"瘸腿\"喂给 AMP 训练，必然无法达成稳定行走+85%速度跟随。",
+      "solution": "(1) IK match table 里的 body/link 名必须与 X1 mocap XML 完全一致；拼写错（如 lleft_knee_pitch_link，gmr_f1/smplx_to_x1.json 第24/40行两处）会让该约束被静默丢弃、对应关节停在初值——改名 left_knee_pitch_link 修复。(2) 估计骨长 FK 易把 IK 目标放到 X1 可达工作空间外，求解器不收敛即返回初值，表现为多关节冻结在圆整常数（0.35/-0.45/-0.55…），需核对目标可达性/重算真实骨长。(3) 重定向校验必须含步态完整性指标：每个膝活动范围 >~0.3rad、左右膝交替对称（相关系数、range 接近）、双脚 stance 接触交替出现，而不仅是 NaN/Inf/形状——这正是目标\"不是只确认文件可读取\"的硬性要求。",
+      "outcome": {
+        "success": true,
+        "summary": "重定向输出\"格式合法但关节冻结/无步态\"是 IK 约束静默丢失的典型；校验须补关节活动范围、左右对称、双脚接触交替，不能只看 NaN/形状。",
+        "failureReason": "IK match table body 名拼写错（lleft_knee_pitch_link）+ 估计骨长使部分 IK 目标不可达，约束被静默丢弃，求解器返回初值，导致多关节冻结、无有效步态。",
+        "workarounds": [
+          "逐关节 std/range 检查冻结关节",
+          "左右膝活动范围与交替相关性对比",
+          "双脚 foot_contact 交替 stance 检查",
+          "把 match table 的 body 名与 mocap XML 自动 diff 对齐"
+        ]
+      },
+      "abstractPrinciple": "结构合法（无 NaN / 形状对 / 关节名齐）≠ 语义正确。IK/重定向类产出必须用\"关节是否真的动了 + 左右对称 + 接触交替\"等步态完整性指标校验，否则静默失败会被放行并污染下游训练。",
+      "confidenceTier": "observed",
+      "evidenceRefs": [
+        "source: NPZ 实测（data/retarget_gmr/x1_walk_retargeted.npz）：7/12 关节 std=0.000；右膝 range=0.18 vs 左膝 0.70，corr=-0.247；foot_contact 左列均值=0.0（左脚全程不触地）。json 缺陷：gmr_f1/smplx_to_x1.json 第24、40行 \"lleft_knee_pitch_link\" 拼写错（grep -n + python json.load 双确认）。"
+      ],
+      "sourceSessionId": "4e1915a3-66ea-469c-9845-50315d7ac52b",
+      "id": "exp_ms8jtr5s_905964dc",
+      "schemaVersion": "1.0",
+      "createdAt": 1785478545856,
+      "updatedAt": 1785478545856
+    },
+    {
+      "domain": "general",
+      "tags": [
+        "retargeting",
+        "python-import",
+        "vendored-libs",
+        "execution-blocked",
+        "mujoco",
+        "gmr",
+        "progress-tracking"
+      ],
+      "difficulty": "medium",
+      "title": "Vendored pylibs 路径未加入 sys.path 致 mink/mujoco 静默导入失败、重定向无产物",
+      "problem": "重定向脚本 scripts/retarget_smplx_to_x1.py 依赖 mink/mujoco，但这些库只存在于 vendored 目录 gmr_f1/pylibs/。脚本在第 20 行定义了 PYLIBS 变量，却从未把它插入 sys.path，顶部直接 `import mink`。用默认 python3 运行会在导入阶段失败、不产生任何输出 NPZ；而 data/retarget_gmr/ 在 turnCount=30 时仍为空目录。",
+      "solution": "凡是用 vendored site-packages（如 gmr_f1/pylibs）的脚本，必须在脚本顶部 `sys.path.insert(0, str(.../pylibs))`，或统一用 `PYTHONPATH=<root>/gmr_f1/pylibs python3 <script>` 调用，并在声明某步骤完成前\"真的跑通到产出文件\"。判据：completedSteps 长期为空 + 产物目录为空 + 脚本 import 链未验证 = 执行卡住的强信号，需立即用一次真实运行验证而非继续改代码。",
+      "outcome": {
+        "success": false,
+        "summary": "重定向脚本因 PYLIBS 未入 sys.path 导致 mink/mujoco 导入失败、30 轮无产物；须修路径并以真实运行验证产物后再推进。",
+        "failureReason": "脚本定义了依赖路径变量 PYLIBS 但未加入 sys.path；默认环境无 mink/mujoco，导入即 ModuleNotFoundError，故 30 轮后仍无重定向产物。",
+        "workarounds": [
+          "脚本顶部 sys.path.insert(0, str(ROOT/'gmr_f1'/'pylibs'))",
+          "或以 PYTHONPATH=<root>/gmr_f1/pylibs python3 <script> 运行",
+          "声明步骤完成前用一次端到端运行确认产物文件存在",
+          "发现 completedSteps 空+产物目录空 时优先怀疑执行被阻塞，而非仍在进行"
+        ]
+      },
+      "abstractPrinciple": "使用 vendored 依赖时，路径必须真正生效（sys.path 或 PYTHONPATH），否则导入静默失败、产出为零；\"进度未更新 + 产物目录为空\"是执行被阻塞而非仍在进行的强信号。",
+      "confidenceTier": "observed",
+      "evidenceRefs": [
+        "source: 执行失败：默认环境 `python3 -c 'import mink'` 返回 ModuleNotFoundError 并退出；脚本 grep 确认无 sys.path 操作；data/retarget_gmr/ 产物目录为空（checkpoint turnCount=30, completedSteps=[]）。",
+        "python3 -c 'import mink' -> ModuleNotFoundError: No module named 'mink'",
+        "PYTHONPATH=gmr_f1/pylibs python3 -c 'import mink,mujoco' -> mink+mujoco import OK",
+        "grep -n 'sys.path' scripts/retarget_smplx_to_x1.py -> 无任何 sys.path 操作",
+        "ls data/retarget_gmr/ -> 空目录（turnCount=30, completedSteps=[]）"
+      ],
+      "sourceSessionId": "4e1915a3-66ea-469c-9845-50315d7ac52b",
+      "id": "exp_ms8j8wbh_f314afce",
+      "schemaVersion": "1.0",
+      "createdAt": 1785477572765,
+      "updatedAt": 1785477572765
+    }
+  ]
+}

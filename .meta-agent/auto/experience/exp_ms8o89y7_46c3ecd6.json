@@ -1,0 +1,42 @@
+{
+  "domain": "general",
+  "tags": [
+    "amp",
+    "discriminator-domination",
+    "style-reward-collapse",
+    "gate-c",
+    "gradmotion",
+    "silent-failure",
+    "metric-misread",
+    "locomotion"
+  ],
+  "difficulty": "medium",
+  "title": "完全被支配的 AMP 判别器(acc=1.0/style_r≈0)被当 PASS：style_r 仅被 exp-floor 掩盖而非修复",
+  "problem": "Gate C AMP 训练（gradmotion TASK_20260731_103，2000 iter）的最终判别器指标为 disc_accuracy=1.0、style_reward=0.0355、e_logit=7.66/p_logit=-5.69、disc_loss=0.014。实测 gradmotion 日志逐 iter 均显示 acc=1.000、style_r 在 0.0353–0.0362 完全恒定（iter 1912–1938+）。这典型属于判别器完全支配/风格奖励坍缩——判别器 100% 区分策略与专家、几乎不给任何模仿梯度。但 checkpoint 的 progress.json 与 train_eval_report.json 仅因速度跟随 86.4%/0 跌倒/2401 步达标即判 Gate C PASS，并在 gateA 证据里声称 commit 427345e5 已\"fix AMP discriminator domination\"。",
+  "solution": "判 AMP 健康度不能用\"style_r 是否被 floor 住(>0)\"作为 PASS 准则；健康 AMP 的 disc_accuracy 应在 0.5–0.75 间波动且远低于 1.0，style_r 应为有意义正值且随策略变化而响应。修复\"支配\"必须真正打破判别器饱和（降判别器容量/学习率/更新频率，加 gradient penalty / spectral norm / label smoothing / instance noise），让 acc 回落到 <1.0、style_r 响应起来；而不是仅给 style_r 加 exp 下限地板。放行前应额外确认策略确实在模仿重定向后的参考步态（姿态/接触时序相似度），不能只看速度跟随数字。gateA 的 PASS 条件需从\"style_r bounded\"升级为\"disc_accuracy 未饱和 + style_r 响应\"。",
+  "outcome": {
+    "success": false,
+    "summary": "判别器 acc=1.0、style_r≈0 全程恒定证明 AMP 判别器被完全支配，style_r 只被 exp-floor 掩盖而未修复；不应据速度跟随数字判 Gate C PASS，需先打破判别器饱和并验证真实步态模仿。",
+    "failureReason": "判别器完全饱和(acc=1.0)：判别器 100% 区分策略与专家，给策略的模仿梯度几乎为零；style_reward 长期恒定≈0.035 说明判别器对策略行为无响应。gateA 的修复仅给 style_r 加 exp 下限地板(exp reward \"never collapses to 0\")并微降 disc_lr/disc_train_iters，只是把坍缩症状掩盖成一个小常数，并未打破判别器支配，故 1900+ iter 后判别器仍 100% 准确。结果策略几乎完全靠手写奖励(tracking_lin_vel/feet_clearance 等)训练，重定向专家动作的风格未被模仿。",
+    "workarounds": [
+      "放行 AMP 前检查 disc_accuracy<1.0(目标 0.5–0.75)且 style_r 跨 iter 有响应波动，而非仅 style_r>0",
+      "打破判别器饱和：降容量/lr/更新频率，加 gradient penalty/spectral norm/label smoothing/instance noise",
+      "除速度跟随数字外，额外校验策略对参考步态的姿态与接触时序相似度",
+      "把 gateA PASS 准则从'style_r bounded'升级为'disc 未饱和 + style_r 响应'"
+    ]
+  },
+  "abstractPrinciple": "健康 AMP 的判别器必须处于对抗均衡(acc 远低于 1.0、style_r 响应)，而非仅靠地板函数把 style_r 撑在 0 以上；\"风格奖励有数值\"≠\"风格模仿在工作\"。",
+  "confidenceTier": "observed",
+  "evidenceRefs": [
+    "source: gradmotion 任务 TASK_20260731_103 实时日志（gm task logs）：iter 1912–1938+ 每 iter 均报 acc=1.000、style_r=0.0353–0.0362 恒定、e_logit≈7.6–7.8/p_logit≈-5.66–-5.69；data/amp_eval/train_eval_report.json final_amp_metrics disc_accuracy=1.0/style_reward=0.0355；与 commit 427345e5声称\"fix AMP discriminator domination\"及 progress.json gateA\"style_r bounded PASS\"直接矛盾。",
+    "gm task logs TASK_20260731_103: iter=1912 disc_loss=0.0141 style_r=0.0362 acc=1.000 e_logit=7.599 p_logit=-5.663；iter=1938 acc=1.000 style_r=0.0355（全程恒定）",
+    "data/amp_eval/train_eval_report.json: disc_accuracy=1.0, expert_logit=7.760, policy_logit=-5.694, style_reward=0.0355, disc_loss=0.0140",
+    "commit 427345e5: '[gateC-iter2] fix AMP discriminator domination: exp reward (never collapses to 0), disc_lr 1e-4->5e-5, disc_train_iters 2->1'",
+    "state/progress.json gateA.evidence: 'disc_loss 1.52->1.40, style_r bounded' 判 PASS"
+  ],
+  "sourceSessionId": "46f99326-da79-4adb-99ca-a3b0ccd9e1c7",
+  "id": "exp_ms8o89y7_46c3ecd6",
+  "schemaVersion": "1.0",
+  "createdAt": 1785485941855,
+  "updatedAt": 1785485941855
+}

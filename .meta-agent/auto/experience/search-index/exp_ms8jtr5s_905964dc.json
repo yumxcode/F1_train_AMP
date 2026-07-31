@@ -1,0 +1,37 @@
+{
+  "domain": "general",
+  "tags": [
+    "retargeting",
+    "ik",
+    "silent-failure",
+    "gate-b",
+    "validation",
+    "x1",
+    "amp"
+  ],
+  "difficulty": "medium",
+  "title": "IK 重定向关节名拼写错致约束静默丢失：输出\"格式合法但无步态\"",
+  "problem": "用 GMR IK 把 SMPLX 行走动作重定向到 X1，输出 NPZ 格式合法（无 NaN/Inf、形状正确、12 关节名齐全），但实测 12 关节中 7 个完全冻结（std=0.000 停在初值）、右膝活动范围仅 0.18（左膝 0.70）、左脚全程无接触（foot_contact 左列均值=0.0），不是有效行走步态。若只按 NaN/形状校验即放行，会把\"瘸腿\"喂给 AMP 训练，必然无法达成稳定行走+85%速度跟随。",
+  "solution": "(1) IK match table 里的 body/link 名必须与 X1 mocap XML 完全一致；拼写错（如 lleft_knee_pitch_link，gmr_f1/smplx_to_x1.json 第24/40行两处）会让该约束被静默丢弃、对应关节停在初值——改名 left_knee_pitch_link 修复。(2) 估计骨长 FK 易把 IK 目标放到 X1 可达工作空间外，求解器不收敛即返回初值，表现为多关节冻结在圆整常数（0.35/-0.45/-0.55…），需核对目标可达性/重算真实骨长。(3) 重定向校验必须含步态完整性指标：每个膝活动范围 >~0.3rad、左右膝交替对称（相关系数、range 接近）、双脚 stance 接触交替出现，而不仅是 NaN/Inf/形状——这正是目标\"不是只确认文件可读取\"的硬性要求。",
+  "outcome": {
+    "success": true,
+    "summary": "重定向输出\"格式合法但关节冻结/无步态\"是 IK 约束静默丢失的典型；校验须补关节活动范围、左右对称、双脚接触交替，不能只看 NaN/形状。",
+    "failureReason": "IK match table body 名拼写错（lleft_knee_pitch_link）+ 估计骨长使部分 IK 目标不可达，约束被静默丢弃，求解器返回初值，导致多关节冻结、无有效步态。",
+    "workarounds": [
+      "逐关节 std/range 检查冻结关节",
+      "左右膝活动范围与交替相关性对比",
+      "双脚 foot_contact 交替 stance 检查",
+      "把 match table 的 body 名与 mocap XML 自动 diff 对齐"
+    ]
+  },
+  "abstractPrinciple": "结构合法（无 NaN / 形状对 / 关节名齐）≠ 语义正确。IK/重定向类产出必须用\"关节是否真的动了 + 左右对称 + 接触交替\"等步态完整性指标校验，否则静默失败会被放行并污染下游训练。",
+  "confidenceTier": "observed",
+  "evidenceRefs": [
+    "source: NPZ 实测（data/retarget_gmr/x1_walk_retargeted.npz）：7/12 关节 std=0.000；右膝 range=0.18 vs 左膝 0.70，corr=-0.247；foot_contact 左列均值=0.0（左脚全程不触地）。json 缺陷：gmr_f1/smplx_to_x1.json 第24、40行 \"lleft_knee_pitch_link\" 拼写错（grep -n + python json.load 双确认）。"
+  ],
+  "sourceSessionId": "4e1915a3-66ea-469c-9845-50315d7ac52b",
+  "id": "exp_ms8jtr5s_905964dc",
+  "schemaVersion": "1.0",
+  "createdAt": 1785478545856,
+  "updatedAt": 1785478545856
+}

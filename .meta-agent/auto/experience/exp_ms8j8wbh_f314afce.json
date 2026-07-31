@@ -1,0 +1,41 @@
+{
+  "domain": "general",
+  "tags": [
+    "retargeting",
+    "python-import",
+    "vendored-libs",
+    "execution-blocked",
+    "mujoco",
+    "gmr",
+    "progress-tracking"
+  ],
+  "difficulty": "medium",
+  "title": "Vendored pylibs 路径未加入 sys.path 致 mink/mujoco 静默导入失败、重定向无产物",
+  "problem": "重定向脚本 scripts/retarget_smplx_to_x1.py 依赖 mink/mujoco，但这些库只存在于 vendored 目录 gmr_f1/pylibs/。脚本在第 20 行定义了 PYLIBS 变量，却从未把它插入 sys.path，顶部直接 `import mink`。用默认 python3 运行会在导入阶段失败、不产生任何输出 NPZ；而 data/retarget_gmr/ 在 turnCount=30 时仍为空目录。",
+  "solution": "凡是用 vendored site-packages（如 gmr_f1/pylibs）的脚本，必须在脚本顶部 `sys.path.insert(0, str(.../pylibs))`，或统一用 `PYTHONPATH=<root>/gmr_f1/pylibs python3 <script>` 调用，并在声明某步骤完成前\"真的跑通到产出文件\"。判据：completedSteps 长期为空 + 产物目录为空 + 脚本 import 链未验证 = 执行卡住的强信号，需立即用一次真实运行验证而非继续改代码。",
+  "outcome": {
+    "success": false,
+    "summary": "重定向脚本因 PYLIBS 未入 sys.path 导致 mink/mujoco 导入失败、30 轮无产物；须修路径并以真实运行验证产物后再推进。",
+    "failureReason": "脚本定义了依赖路径变量 PYLIBS 但未加入 sys.path；默认环境无 mink/mujoco，导入即 ModuleNotFoundError，故 30 轮后仍无重定向产物。",
+    "workarounds": [
+      "脚本顶部 sys.path.insert(0, str(ROOT/'gmr_f1'/'pylibs'))",
+      "或以 PYTHONPATH=<root>/gmr_f1/pylibs python3 <script> 运行",
+      "声明步骤完成前用一次端到端运行确认产物文件存在",
+      "发现 completedSteps 空+产物目录空 时优先怀疑执行被阻塞，而非仍在进行"
+    ]
+  },
+  "abstractPrinciple": "使用 vendored 依赖时，路径必须真正生效（sys.path 或 PYTHONPATH），否则导入静默失败、产出为零；\"进度未更新 + 产物目录为空\"是执行被阻塞而非仍在进行的强信号。",
+  "confidenceTier": "observed",
+  "evidenceRefs": [
+    "source: 执行失败：默认环境 `python3 -c 'import mink'` 返回 ModuleNotFoundError 并退出；脚本 grep 确认无 sys.path 操作；data/retarget_gmr/ 产物目录为空（checkpoint turnCount=30, completedSteps=[]）。",
+    "python3 -c 'import mink' -> ModuleNotFoundError: No module named 'mink'",
+    "PYTHONPATH=gmr_f1/pylibs python3 -c 'import mink,mujoco' -> mink+mujoco import OK",
+    "grep -n 'sys.path' scripts/retarget_smplx_to_x1.py -> 无任何 sys.path 操作",
+    "ls data/retarget_gmr/ -> 空目录（turnCount=30, completedSteps=[]）"
+  ],
+  "sourceSessionId": "4e1915a3-66ea-469c-9845-50315d7ac52b",
+  "id": "exp_ms8j8wbh_f314afce",
+  "schemaVersion": "1.0",
+  "createdAt": 1785477572765,
+  "updatedAt": 1785477572765
+}

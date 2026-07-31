@@ -1,0 +1,42 @@
+{
+  "domain": "general",
+  "tags": [
+    "context-reset",
+    "load-state",
+    "phase-regression",
+    "amp-loop",
+    "retargeting",
+    "gradmotion",
+    "state-persistence"
+  ],
+  "difficulty": "medium",
+  "title": "上下文重置后未执行 load_state 导致阶段回退：重做已验收的 Gate B 重定向、遗弃在飞训练任务",
+  "problem": "长周期自主任务（F1 AMP 行走）的 turn-140 checkpoint 显示 Gate B 重定向已通过（GMR 微分 IK，24/24+MuJoCo 0穿透/0滑移/0悬空，clip manifest 诚实标注 non-loopable），Gate A 已提交，Gate C 已进入 AMP 训练迭代（iter22-25），并在 gradmotion 创建了在飞训练任务 TASK_20260731_103。但该 run 被 cancelled_by_user，新 run 从 turn=30 重新启动后 completedSteps=[]、artifacts=[]，重新规划\"从零重写 retargeting\"，且 state/ 目录为空（无 progress.json）。原因是新 run 没有执行 amp_loop.md §7 的 load_state 节点去读取 checkpoint/git 历史/已存在产物，直接退化为\"phase1=重定向\"默认假设。",
+  "solution": "每次 run 启动（尤其 context 重置/compaction/cancel 后）必须先强制执行 load_state：(1) 读 .meta-agent/auto/checkpoints/*.json 取最近一次 turnCount 最高的 checkpoint，恢复 completedSteps/pendingTodos/phase；(2) `git log --oneline` 扫一遍 gateA/gateB/gateC 提交；(3) 用 find 核对已存在产物（data/retarget_gmr/x1_walk_retargeted.npz + validation_report.json + clip_manifest.json）是否仍有效。只有\"现有产物确实缺失/损坏或 Gate B 验证 fail\"才允许重做重定向。恢复后必须填充 state/progress.json（phase + code/data revision + Gate 证据），使后续重置不再丢阶段。优先恢复并监控在飞的 gradmotion 远端训练任务，而非重做已验收数据。",
+  "outcome": {
+    "success": false,
+    "summary": "上下文重置后未 load_state，导致回退重做已验收 Gate B 并遗弃在飞 gradmotion 训练；应恢复 phase=GATE_C 并监控训练，而非重做重定向。",
+    "failureReason": "未执行 load_state：新 run 未读 turn-140 checkpoint（Gate B PASS、TASK_20260731_103 在飞）与 git 历史，state/ 为空无 phase 持久化，导致默认\"从零做重定向\"，且工作脚本 retarget_x1.py 本就已实现所谓\"待修复项\"（ankle_roll_link L240、四元数 Z-up/wxyz L223-225、orientation_cost L91、左右 swap）。",
+    "workarounds": [
+      "启动即执行 load_state：读最高 turnCount checkpoint + git log --oneline 过滤 gateA/B/C + find 核对 npz/validation_report 完整性",
+      "填充 state/progress.json 记录 phase=amp_training 及 Gate A/B 证据，避免再次回退",
+      "重做重定向前必须给出 Gate B 现有 clip 的具体失败项；无失败则直接进入 Gate C 监控 gradmotion 任务"
+    ]
+  },
+  "abstractPrinciple": "长周期任务在 context 重置后，规划前必须先 load_state（checkpoint+git log+产物核对）恢复 phase；否则会回退到重做已验收阶段、遗弃在飞远端训练任务。state/ 持久化是防回退的关键。",
+  "confidenceTier": "observed",
+  "evidenceRefs": [
+    "source: turn-140 checkpoint(4e1915a3) 明确 Gate B PASS + TASK_20260731_103 在飞，而 turn-30 checkpoint(46f99326) completedSteps=[] 且 pendingTodos 为\"重写 retargeting/修复 IK/重新生成 npz\"；git log 确认 Gate A/B/C 均已提交；retarget_x1.py 已实现 redo 计划声称要修复的全部项；state/ 为空。三者矛盾=上下文重置导致阶段回退。",
+    ".meta-agent/auto/checkpoints/4e1915a3-66ea-469c-9845-50315d7ac52b.json turn=140 completedSteps 含 'Gate B validation ... ALL PASS'、note 提 TASK_20260731_103 在飞",
+    ".meta-agent/auto/checkpoints/46f99326-da79-4adb-99ca-a3b0ccd9e1c7.json turn=30 completedSteps=[] 且 pendingTodos 全为重做重定向",
+    "git log: e9109dfb [gateB] recovered validated retargeted clip (24/24+6/8 PASS): 0 penetration,0 sliding,0 suspension; c65d6474 [gateA] PASS; 427345e5 [gateC-iter2]",
+    "gmr_f1/retarget_x1.py:240 foot_bodies=[left/right_ankle_roll_link]; :223-225 mujoco quat wxyz->xyzw; :91 orientation_cost; :112-136 rot_offsets+swap —— 已实现 redo 计划的全部待修项",
+    "state/ 目录为空（无 progress.json），phase 未持久化",
+    "data/retarget_gmr/x1_walk_retargeted.npz 完好：(337,12) 全 finite，validation_report 24/24 PASS"
+  ],
+  "sourceSessionId": "46f99326-da79-4adb-99ca-a3b0ccd9e1c7",
+  "id": "exp_ms8lw71j_f203a051",
+  "schemaVersion": "1.0",
+  "createdAt": 1785482018983,
+  "updatedAt": 1785482018983
+}

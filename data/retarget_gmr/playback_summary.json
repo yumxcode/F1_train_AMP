@@ -1,0 +1,22 @@
+{
+  "clip": "data/retarget_gmr/x1_walk_retargeted.npz",
+  "frames": 337,
+  "fps": 100.0,
+  "duration_s": 3.37,
+  "avg_speed_mps": 0.9058805315444258,
+  "root_z_range": [
+    0.5728776807179133,
+    0.6372105367130141
+  ],
+  "left_foot": {
+    "stance_pct": 68.84272997032642,
+    "clearance_m": 0.11174789753932118
+  },
+  "right_foot": {
+    "stance_pct": 76.26112759643917,
+    "clearance_m": 0.10768622972940131
+  },
+  "double_support_pct": 45.103857566765576,
+  "loopable": false,
+  "loop_fail_reason": "contact state mismatch: first=[1,0] last=[1,1]"
+}

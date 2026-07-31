@@ -1,0 +1,51 @@
+{
+  "robot_root_name": "x1-body",
+  "human_root_name": "pelvis",
+  "ground_height": 0.0,
+  "human_height_assumption": 1.8,
+  "use_ik_match_table1": true,
+  "use_ik_match_table2": true,
+  "human_scale_table": {
+    "pelvis": 1.0, "spine1": 1.0,
+    "left_hip": 0.89, "right_hip": 0.89,
+    "left_knee": 0.70, "right_knee": 0.70,
+    "left_ankle": 0.82, "right_ankle": 0.82,
+    "left_foot": 0.82, "right_foot": 0.82,
+    "left_shoulder": 0.70, "right_shoulder": 0.70,
+    "left_elbow": 0.70, "right_elbow": 0.70,
+    "left_wrist": 0.70, "right_wrist": 0.70
+  },
+  "_note": "FIXED v3: Target ankle_roll_link (foot body) instead of ankle_pitch_link to drive ALL leg joints including ankle_roll. Map SMPL foot (chain end) to X1 ankle_roll_link. Added left_foot/right_foot to scale_table. L/R swap preserved. Position-only IK (rot_weight=0).",
+  "ik_match_table1": {
+    "x1-body": ["pelvis", 10, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "right_hip_pitch_link": ["left_hip", 10, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "right_knee_pitch_link": ["left_knee", 50, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "right_ankle_roll_link": ["left_foot", 50, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "left_hip_pitch_link": ["right_hip", 10, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "lleft_knee_pitch_link": ["right_knee", 50, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "left_ankle_roll_link": ["right_foot", 50, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "body_yaw": ["spine1", 0, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "right_shoulder_yaw": ["left_shoulder", 5, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "right_elbow_yaw": ["left_elbow", 5, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "right_wrist_roll": ["left_wrist", 5, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "left_shoulder_yaw": ["right_shoulder", 5, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "left_elbow_yaw": ["right_elbow", 5, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "left_wrist_roll": ["right_wrist", 5, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]]
+  },
+  "ik_match_table2": {
+    "x1-body": ["pelvis", 10, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "right_hip_pitch_link": ["left_hip", 10, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "right_knee_pitch_link": ["left_knee", 50, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "right_ankle_roll_link": ["left_foot", 50, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "left_hip_pitch_link": ["right_hip", 10, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "lleft_knee_pitch_link": ["right_knee", 50, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "left_ankle_roll_link": ["right_foot", 50, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "body_yaw": ["spine1", 0, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "right_shoulder_yaw": ["left_shoulder", 10, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "right_elbow_yaw": ["left_elbow", 10, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "right_wrist_roll": ["left_wrist", 10, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "left_shoulder_yaw": ["right_shoulder", 10, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "left_elbow_yaw": ["right_elbow", 10, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+    "left_wrist_roll": ["right_wrist", 10, 0, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]]
+  }
+}

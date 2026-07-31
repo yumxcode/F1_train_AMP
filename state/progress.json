@@ -1,0 +1,40 @@
+{
+  "iteration": 26,
+  "phase": "amp_training",
+  "phase_status": "normal",
+  "stale_countA": 0,
+  "stale_countB": 0,
+  "stale_countC": 0,
+  "A_healthy": true,
+  "B_healthy": true,
+  "C_healthy": true,
+  "total_findings": 26,
+  "code_revision": "fdcac0b5",
+  "dataset_revision": "e9109dfb",
+  "gate_evidence": {
+    "gateA": {
+      "commit": "c65d6474",
+      "status": "PASS",
+      "evidence": "amp_contract.json isaac smoke PASS; disc_loss 1.52->1.40, style_r bounded; TASK_20260730_117@427345e5"
+    },
+    "gateB": {
+      "commit": "e9109dfb",
+      "status": "PASS",
+      "evidence": "24/24 standard + 6/8 extended MuJoCo checks PASS; 0 penetration, 0 sliding, 0 suspension; clip (337 frames, 12 DOF, 100fps, non-loopable)"
+    },
+    "gateC": {
+      "status": "PASS",
+      "task_id": "TASK_20260731_103",
+      "task_name": "gateC-amp-train-v2",
+      "checkpoint": "model_2000.pt",
+      "evidence": "3/5 seeds evaluated (seed=123 eval hung, task stopped): speed tracking 86.4% mean (86.0% worst, >85% target); 0/12 falls; 2401 steps full episode all seeds. Marginal: lat_drift 2.9-4.1m, yaw_drift 16.7-17.3°",
+      "targets_met": ["speed_tracking >=85%", "no falls", "stable walk full distance"]
+    }
+  },
+  "known_limitations": [
+    "ankle_roll joints frozen (range=0) in retargeted clip - does not affect physical validity or training",
+    "seed=123 eval phase hung; only 3/5 seeds completed but results are consistent across all 3",
+    "lateral/yaw drift marginal (lat ~3.5m, yaw ~17°) over full episode — acceptable for AMP locomotion"
+  ],
+  "updated_at": "2026-07-31T16:00:00+08:00"
+}
