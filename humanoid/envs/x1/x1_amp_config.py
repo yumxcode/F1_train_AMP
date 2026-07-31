@@ -54,11 +54,14 @@ class X1AMPCfgPPO(X1DHStandCfgPPO):
     class amp:
         # Discriminator feature contract (must equal MotionLib.AMP_OBS_DIM == 35).
         disc_input_dim = AMP_OBS_DIM
-        # v2 anti-domination: spectral norm + symmetric GP + label smoothing + reduced capacity
-        disc_hidden_dims = [512, 256]   # was [1024, 512] — over-parameterized for 35-dim input
-        disc_lr = 5e-5
-        disc_grad_penalty_coef = 10.0   # was 5.0 — symmetric R1 on both expert+policy
-        disc_label_smoothing = 0.1     # soft labels prevent logit saturation
+        # Official NVIDIA AMP regularization stack (IsaacGymEnvs HumanoidAMP):
+        # R1 GP(λ=5) on real samples + logit_weight_reg(0.05) + weight_decay(1e-4) + BCEWithLogits
+        # NO spectral norm / label smoothing / instance noise (absent from official configs)
+        disc_hidden_dims = [1024, 512]   # official capacity — stability from penalties, not shrinking
+        disc_lr = 5e-5                   # shared LR (official: disc_lr == policy_lr)
+        disc_grad_penalty_coef = 5.0     # official R1 on real/expert samples
+        disc_logit_reg = 0.05            # official: shrinks logit magnitude → prevents saturation
+        disc_weight_decay = 1e-4         # official global weight decay
         disc_train_iters = 1
         disc_batch_size = 4096
         # Style reward mixing.

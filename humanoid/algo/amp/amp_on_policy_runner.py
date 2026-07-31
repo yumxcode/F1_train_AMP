@@ -32,13 +32,14 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         self.disc_train_iters = int(amp_cfg.get("disc_train_iters", 2))
         self.disc_batch = int(amp_cfg.get("disc_batch_size", 4096))
         self.disc_lr = float(amp_cfg.get("disc_lr", 1e-4))
-        self.disc_gp = float(amp_cfg.get("disc_grad_penalty_coef", 10.0))
-        self.disc_label_smooth = float(amp_cfg.get("disc_label_smoothing", 0.1))
+        self.disc_gp = float(amp_cfg.get("disc_grad_penalty_coef", 5.0))
+        self.disc_logit_reg = float(amp_cfg.get("disc_logit_reg", 0.05))
+        self.disc_weight_decay = float(amp_cfg.get("disc_weight_decay", 1e-4))
         self.ema_decay = float(amp_cfg.get("expert_logit_ema_decay", 0.95))
 
         disc_dim = int(amp_cfg.get("disc_input_dim", AMP_OBS_DIM))
         disc_hid = amp_cfg.get("disc_hidden_dims", [1024, 512])
-        self.disc = Discriminator(disc_dim, hidden_dims=disc_hid).to(self.device)
+        self.disc = Discriminator(disc_dim, hidden_dims=disc_hid, activation="relu").to(self.device)
         self.disc_optimizer = torch.optim.Adam(self.disc.parameters(), lr=self.disc_lr)
 
         # expert motion library (retargeted clips). Empty list => style reward disabled.
@@ -163,8 +164,10 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         for _ in range(self.disc_train_iters):
             expert = self.motion_lib.sample_expert(self.disc_batch)
             policy = self.policy_amp_buffer.sample(self.disc_batch)
-            m = compute_disc_loss(self.disc, expert, policy, grad_penalty_coef=self.disc_gp,
-                                  label_smooth=self.disc_label_smooth)
+            m = compute_disc_loss(self.disc, expert, policy,
+                                  grad_penalty_coef=self.disc_gp,
+                                  logit_reg_coef=self.disc_logit_reg,
+                                  weight_decay_coef=self.disc_weight_decay)
             self.disc_optimizer.zero_grad()
             m["loss"].backward()
             self.disc_optimizer.step()

@@ -1,11 +1,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""AMP discriminator with anti-domination regularization.
+"""AMP discriminator following NVIDIA official AMP regularization stack.
 
-v2 changes vs original:
-  * Spectral normalization on all linear layers (constrains Lipschitz constant).
-  * Symmetric R1 gradient penalty on BOTH expert and policy samples.
-  * Reduced default capacity [512, 256] (was [1024, 512]) for 35-dim input.
-  * Label smoothing (default 0.1) prevents logit saturation.
+Key differences from naive implementations:
+  * R1 gradient penalty on REAL/demo samples (λ configurable, default 5.0).
+  * Final-logit weight regularization (disc_logit_reg, default 0.05).
+  * Global weight decay (disc_weight_decay, default 1e-4).
+  * BCEWithLogits loss with HARD 0/1 labels (NO label smoothing per official AMP).
+  * NO spectral norm / instance noise / label smoothing (absent from all official configs).
+  * Capacity [1024, 512] matches official — stability comes from penalty terms, not shrinking.
+
+Reference: IsaacGymEnvs HumanoidAMP, ASE amp_agent.py (Peng et al. 2021).
 """
 from __future__ import annotations
 
@@ -13,87 +17,105 @@ from typing import Dict
 
 import torch
 import torch.nn as nn
-from torch.nn.utils import spectral_norm as sn
 
 
 class Discriminator(nn.Module):
-    """Single-logit discriminator over AMP transition features."""
+    """Single-logit discriminator over AMP transition features.
 
-    def __init__(self, input_dim: int, hidden_dims=(512, 256), activation="elu",
-                 use_spectral_norm: bool = True):
+    Input dim = AMP_OBS_DIM. Produces a scalar logit D(x).
+    Architecture: [1024, 512] ReLU → Linear(1), matching official AMP.
+    """
+
+    def __init__(self, input_dim: int, hidden_dims=(1024, 512), activation="relu"):
         super().__init__()
         act = {"elu": nn.ELU, "relu": nn.ReLU, "tanh": nn.Tanh}[activation]
         layers: list[nn.Module] = []
         prev = input_dim
         for h in hidden_dims:
-            lin = nn.Linear(prev, h)
-            if use_spectral_norm:
-                lin = sn(lin)
-            layers += [lin, act()]
+            layers += [nn.Linear(prev, h), act()]
             prev = h
-        out_lin = nn.Linear(prev, 1)
-        if use_spectral_norm:
-            out_lin = sn(out_lin)
-        layers += [out_lin]
         self.trunk = nn.Sequential(*layers)
+        # Separate logit head for weight regularization (disc_logit_reg)
+        self.logit_head = nn.Linear(prev, 1)
+        # Official init: uniform(-1, 1) for logit head
+        nn.init.uniform_(self.logit_head.weight, -1.0, 1.0)
+        nn.init.zeros_(self.logit_head.bias)
         self.input_dim = input_dim
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.trunk(x)
+        h = self.trunk(x)
+        return self.logit_head(h)
 
     def compute_reward(self, policy_logit: torch.Tensor, expert_logit_ema: torch.Tensor,
                        reward_clamp: float = 2.0) -> torch.Tensor:
-        """AMP style reward: r = exp(-0.25 * max(0, ema(D(e)) - D(p)))."""
-        logit_diff = torch.clamp(expert_logit_ema - policy_logit.squeeze(-1), min=0.0)
-        r = torch.exp(-0.25 * logit_diff)
+        """AMP style reward: r = -log(max(1 - sigmoid(D(p)), 1e-4)) * scale.
+
+        This is the OFFICIAL AMP reward formula (Peng et al. 2021).
+        Uses sigmoid of policy logit, NOT the exp-floor workaround.
+        Clamp at 1e-4 prevents reward blow-up when disc is confident.
+        """
+        prob = torch.sigmoid(policy_logit.squeeze(-1))
+        r = -torch.log(torch.clamp(1.0 - prob, min=1e-4))
         return r.clamp(0.0, reward_clamp)
+
+    def get_logit_weights(self):
+        """Return logit head weights for disc_logit_reg."""
+        return self.logit_head.weight
+
+    def get_all_weights(self):
+        """Return all weights for disc_weight_decay."""
+        return list(self.trunk.parameters()) + list(self.logit_head.parameters())
 
 
 def compute_disc_loss(disc: Discriminator, expert: torch.Tensor, policy: torch.Tensor,
-                      grad_penalty_coef: float = 10.0,
-                      label_smooth: float = 0.1) -> Dict[str, torch.Tensor]:
-    """AMP discriminator loss with symmetric R1 GP + label smoothing.
+                      grad_penalty_coef: float = 5.0,
+                      label_smooth: float = 0.0,
+                      logit_reg_coef: float = 0.05,
+                      weight_decay_coef: float = 1e-4) -> Dict[str, torch.Tensor]:
+    """AMP discriminator loss following official NVIDIA/ASE formulation.
 
-    Anti-domination: gradient penalty applied to BOTH expert and policy (symmetric).
-    Label smoothing mixes softplus losses to prevent over-confident logits.
+    Loss = 0.5 * (BCE(fake, 0) + BCE(real, 1))
+         + grad_penalty_coef * mean(||grad_x D(real)||^2)     [R1 on REAL only]
+         + logit_reg_coef * sum(||w_logit||^2)                 [logit weight reg]
+         + weight_decay_coef * sum(||W||^2)                    [global weight decay]
+
+    label_smooth is accepted for API compatibility but defaults to 0.0 (hard labels).
     """
-    d_e = disc(expert)
-    d_p = disc(policy)
+    d_e = disc(expert)   # (batch, 1) — real/demo logits
+    d_p = disc(policy)   # (batch, 1) — fake/agent logits
 
-    # Label-smoothed softplus losses
-    if label_smooth > 0:
-        # real (expert): (1-2s)*softplus(-d_e) + s*softplus(d_e)
-        expert_loss = (1 - 2*label_smooth) * nn.functional.softplus(-d_e).mean() + \
-                       label_smooth * nn.functional.softplus(d_e).mean()
-        # fake (policy): (1-2s)*softplus(d_p) + s*softplus(-d_p)
-        policy_loss = (1 - 2*label_smooth) * nn.functional.softplus(d_p).mean() + \
-                       label_smooth * nn.functional.softplus(-d_p).mean()
-    else:
-        expert_loss = nn.functional.softplus(-d_e).mean()
-        policy_loss = nn.functional.softplus(d_p).mean()
+    # BCEWithLogits with hard labels (official AMP: NO label smoothing)
+    expert_loss = nn.functional.binary_cross_entropy_with_logits(d_e, torch.ones_like(d_e))
+    policy_loss = nn.functional.binary_cross_entropy_with_logits(d_p, torch.zeros_like(d_p))
+    bce_loss = 0.5 * (expert_loss + policy_loss)
 
-    # Symmetric R1 gradient penalty on BOTH distributions
+    # R1 gradient penalty on REAL/expert samples (official: real-only)
     grad_penalty = torch.tensor(0.0, device=expert.device)
     if grad_penalty_coef > 0:
-        # Policy samples
-        policy_g = policy.detach().requires_grad_(True)
-        d_pg = disc(policy_g)
-        grads_p = torch.autograd.grad(
-            outputs=d_pg.sum(), inputs=policy_g,
-            create_graph=True, retain_graph=True, only_inputs=True)[0]
-        gp_p = (grads_p.pow(2).reshape(grads_p.shape[0], -1).sum(-1)).mean()
-
-        # Expert samples (symmetric penalty)
         expert_g = expert.detach().requires_grad_(True)
         d_eg = disc(expert_g)
         grads_e = torch.autograd.grad(
             outputs=d_eg.sum(), inputs=expert_g,
             create_graph=True, retain_graph=True, only_inputs=True)[0]
-        gp_e = (grads_e.pow(2).reshape(grads_e.shape[0], -1).sum(-1)).mean()
+        grad_penalty = (grads_e.pow(2).reshape(grads_e.shape[0], -1).sum(-1)).mean()
 
-        grad_penalty = 0.5 * (gp_p + gp_e)
+    # Logit weight regularization (disc_logit_reg)
+    logit_reg = torch.tensor(0.0, device=expert.device)
+    if logit_reg_coef > 0:
+        w = disc.get_logit_weights()
+        logit_reg = (w ** 2).sum()
 
-    loss = expert_loss + policy_loss + grad_penalty_coef * grad_penalty
+    # Global weight decay
+    weight_decay = torch.tensor(0.0, device=expert.device)
+    if weight_decay_coef > 0:
+        wd_sum = torch.tensor(0.0, device=expert.device)
+        for p in disc.get_all_weights():
+            wd_sum = wd_sum + (p ** 2).sum()
+        weight_decay = wd_sum
+
+    loss = bce_loss + grad_penalty_coef * grad_penalty + \
+           logit_reg_coef * logit_reg + weight_decay_coef * weight_decay
+
     with torch.no_grad():
         acc = ((d_e > 0).float().mean() + (d_p < 0).float().mean()) * 0.5
     return {
