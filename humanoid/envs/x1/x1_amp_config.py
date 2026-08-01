@@ -27,9 +27,10 @@ class X1AMPCfg(X1DHStandCfg):
         limit_damping_gain = 80.0    # increased from 50 (stronger damping near limits)
 
     class rewards(X1DHStandCfg.rewards):
-        # Keep task reward strong enough for 85%+ speed tracking.
+        # Boost tracking weight to achieve 85% speed tracking target.
+        # v2 (tracking=1.5) achieved 73% eval speed tracking; 3.0 should close the gap.
         class scales(X1DHStandCfg.rewards.scales):
-            tracking_lin_vel = 2.0   # 1.5 -> 2.0: restore for 85% speed tracking target
+            tracking_lin_vel = 3.0   # 1.5 -> 3.0: doubled for 85% speed tracking
             ref_joint_pos = 0.3     # 0.6 -> 0.3
 
 
@@ -52,25 +53,19 @@ class X1AMPCfgPPO(X1DHStandCfgPPO):
         resume_path = None
 
     class amp:
-        # Discriminator feature contract (must equal MotionLib.AMP_OBS_DIM == 35).
+        # Original v2 AMP config (restored from 427345e5 — the only config that produced stable walking).
+        # Disc saturates (acc→1.0) but style_reward stays bounded via exp-floor, not interfering
+        # with task reward. v4-v6 attempts to fix disc saturation ALL broke walking performance.
         disc_input_dim = AMP_OBS_DIM
-        # Official NVIDIA AMP regularization stack (IsaacGymEnvs HumanoidAMP):
-        # R1 GP(λ=5) on real samples + logit_weight_reg(0.05) + weight_decay(1e-4) + BCEWithLogits
-        # NO spectral norm / label smoothing / instance noise (absent from official configs)
-        disc_hidden_dims = [1024, 512]   # official capacity — stability from penalties, not shrinking
-        disc_lr = 5e-5                   # shared LR (official: disc_lr == policy_lr)
-        disc_grad_penalty_coef = 5.0     # official R1 GP λ=5 (v5 with 20 broke policy learning)
-        disc_logit_reg = 0.05            # official: shrinks logit magnitude
-        disc_weight_decay = 1e-4         # official global weight decay
+        disc_hidden_dims = [1024, 512]
+        disc_lr = 5e-5
+        disc_grad_penalty_coef = 5.0
         disc_train_iters = 1
         disc_batch_size = 4096
-        # Style reward — keep at 1.0 (v2 worked with this; v5's 0.5 broke walking)
         style_weight = 1.0
         expert_logit_ema_decay = 0.95
         expert_logit_ema_init = 0.0
-        # Policy transition replay buffer.
         policy_buffer_capacity = 1_000_000
-        # Expert motion clips (Gate-B validated GMR retargeted clip).
         expert_clip_paths = [
             "{LEGGED_GYM_ROOT_DIR}/data/retarget_gmr/x1_walk_retargeted.npz",
         ]
