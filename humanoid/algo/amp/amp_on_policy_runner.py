@@ -63,6 +63,14 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         self.register_buffer_compat = None
         self.expert_logit_ema = torch.tensor(float(amp_cfg.get("expert_logit_ema_init", 0.0)), device=self.device)
 
+        # AMP feature normalization (official AMP: normalize_amp_input=True)
+        # Running mean/std computed from policy data; applied to BOTH expert and policy.
+        # Without this, raw features (dof_vel ~10, gravity ~9.8) make disc trivially win.
+        self.amp_norm_mean = torch.zeros(disc_dim, device=self.device)
+        self.amp_norm_var = torch.ones(disc_dim, device=self.device)
+        self.amp_norm_count = 1e-4
+        self.amp_norm_clip = 10.0
+
         # smoke-sanity: env must expose the AMP feature builder with matching dim
         if not hasattr(self.env, "compute_amp_obs"):
             raise RuntimeError("AMP env must implement compute_amp_obs() -> (N, F) tensor")
@@ -145,13 +153,34 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         self.save(os.path.join(self.log_dir, "model_{}.pt".format(self.current_learning_iteration)))
 
     # ------------------------------------------------------------------ #
+    def _update_amp_norm(self, batch: torch.Tensor):
+        """Update running mean/var from policy AMP batch (Welford online)."""
+        with torch.no_grad():
+            bsz = batch.shape[0]
+            batch_mean = batch.mean(dim=0)
+            batch_var = batch.var(dim=0, unbiased=False)
+            delta = batch_mean - self.amp_norm_mean
+            tot = self.amp_norm_count + bsz
+            self.amp_norm_mean += delta * (bsz / tot)
+            m_a = self.amp_norm_var * self.amp_norm_count
+            m_b = batch_var * bsz
+            M2 = m_a + m_b + delta.pow(2) * self.amp_norm_count * bsz / tot
+            self.amp_norm_var = M2 / tot
+            self.amp_norm_count = tot
+
+    def _normalize_amp(self, x: torch.Tensor) -> torch.Tensor:
+        """Normalize AMP features with running mean/std."""
+        return torch.clamp((x - self.amp_norm_mean) / (self.amp_norm_var.sqrt() + 1e-8),
+                           -self.amp_norm_clip, self.amp_norm_clip)
+
     @torch.no_grad()
     def _add_style_reward(self, rewards: torch.Tensor) -> torch.Tensor:
         if self.motion_lib is None:
             return rewards
         policy_amp = self.env.compute_amp_obs()
         self.policy_amp_buffer.add(policy_amp)
-        d_p = self.disc(policy_amp)
+        self._update_amp_norm(policy_amp)
+        d_p = self.disc(self._normalize_amp(policy_amp))
         style_r = self.disc.compute_reward(d_p, self.expert_logit_ema)
         return rewards + self.style_weight * style_r
 
@@ -164,7 +193,10 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         for _ in range(self.disc_train_iters):
             expert = self.motion_lib.sample_expert(self.disc_batch)
             policy = self.policy_amp_buffer.sample(self.disc_batch)
-            m = compute_disc_loss(self.disc, expert, policy,
+            # Normalize BOTH with running stats from policy data
+            expert_n = self._normalize_amp(expert)
+            policy_n = self._normalize_amp(policy)
+            m = compute_disc_loss(self.disc, expert_n, policy_n,
                                   grad_penalty_coef=self.disc_gp,
                                   logit_reg_coef=self.disc_logit_reg,
                                   weight_decay_coef=self.disc_weight_decay)
@@ -180,7 +212,7 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         with torch.no_grad():
             self.expert_logit_ema.mul_(self.ema_decay).add_((1 - self.ema_decay) * metrics_acc["expert_logit"])
         with torch.no_grad():
-            d_p = self.disc(self.policy_amp_buffer.sample(min(self.disc_batch, max(self.policy_amp_buffer.size, 1))))
+            d_p = self.disc(self._normalize_amp(self.policy_amp_buffer.sample(min(self.disc_batch, max(self.policy_amp_buffer.size, 1)))))
             metrics_acc["style_reward"] = float(self.disc.compute_reward(d_p, self.expert_logit_ema).mean())
         return metrics_acc
 
