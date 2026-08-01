@@ -27,11 +27,11 @@ class X1AMPCfg(X1DHStandCfg):
         limit_damping_gain = 80.0    # increased from 50 (stronger damping near limits)
 
     class rewards(X1DHStandCfg.rewards):
-        # Boost tracking weight to achieve 85% speed tracking target.
-        # v2 (tracking=1.5) achieved 73% eval speed tracking; 3.0 should close the gap.
+        # v2 original tracking weight (proven to produce stable walking).
+        # v7 experiment with 3.0 DEGRADED performance (vx_err 0.13→0.46).
         class scales(X1DHStandCfg.rewards.scales):
-            tracking_lin_vel = 3.0   # 1.5 -> 3.0: doubled for 85% speed tracking
-            ref_joint_pos = 0.3     # 0.6 -> 0.3
+            tracking_lin_vel = 1.5   # v2 proven value
+            ref_joint_pos = 0.3
 
 
 class X1AMPCfgPPO(X1DHStandCfgPPO):
