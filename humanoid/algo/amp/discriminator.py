@@ -47,12 +47,13 @@ class Discriminator(nn.Module):
         return self.logit_head(h)
 
     def compute_reward(self, policy_logit: torch.Tensor, expert_logit_ema: torch.Tensor,
-                       reward_clamp: float = 2.0) -> torch.Tensor:
+                       reward_clamp: float = 0.5) -> torch.Tensor:
         """AMP style reward: r = -log(max(1 - sigmoid(D(p)), 1e-4)) * scale.
 
         This is the OFFICIAL AMP reward formula (Peng et al. 2021).
         Uses sigmoid of policy logit, NOT the exp-floor workaround.
         Clamp at 1e-4 prevents reward blow-up when disc is confident.
+        reward_clamp=0.5 keeps style reward from dominating task reward.
         """
         prob = torch.sigmoid(policy_logit.squeeze(-1))
         r = -torch.log(torch.clamp(1.0 - prob, min=1e-4))

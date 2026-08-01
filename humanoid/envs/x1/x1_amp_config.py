@@ -59,13 +59,13 @@ class X1AMPCfgPPO(X1DHStandCfgPPO):
         # NO spectral norm / label smoothing / instance noise (absent from official configs)
         disc_hidden_dims = [1024, 512]   # official capacity — stability from penalties, not shrinking
         disc_lr = 5e-5                   # shared LR (official: disc_lr == policy_lr)
-        disc_grad_penalty_coef = 20.0    # 5->20: stronger R1 to fight saturation (our 35-dim obs is harder to regularize than official 350-dim)
-        disc_logit_reg = 0.05            # official: shrinks logit magnitude → prevents saturation
+        disc_grad_penalty_coef = 5.0     # official R1 GP λ=5 (v5 with 20 broke policy learning)
+        disc_logit_reg = 0.05            # official: shrinks logit magnitude
         disc_weight_decay = 1e-4         # official global weight decay
         disc_train_iters = 1
         disc_batch_size = 4096
-        # Style reward mixing — lower weight so task reward (velocity tracking) dominates.
-        style_weight = 0.5               # 1.0 -> 0.5: prevent style from overriding velocity tracking
+        # Style reward — keep at 1.0 (v2 worked with this; v5's 0.5 broke walking)
+        style_weight = 1.0
         expert_logit_ema_decay = 0.95
         expert_logit_ema_init = 0.0
         # Policy transition replay buffer.

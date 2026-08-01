@@ -34,7 +34,7 @@ OUT = os.path.join(_REPO, "data", "amp_eval", "train_eval_report.json")
 EVAL_SEEDS = [5, 17, 42, 123, 2024]
 EVAL_EPISODES = 4
 EPISODE_LEN_S = 24
-NOMINAL_VX = 0.4  # mid-range of training command [0.2, 0.6]; lower mismatch with expert 0.9 m/s
+NOMINAL_VX = 0.5  # match v2 working config; eval at training range midpoint
 
 
 def train_phase(args, name, max_iter):
