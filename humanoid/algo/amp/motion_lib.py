@@ -61,7 +61,9 @@ _off = 0
 for _name, _dim in _AMP_LAYOUT:
     AMP_BLOCKS[_name] = (_off, _off + _dim)
     _off += _dim
-AMP_OBS_DIM: int = _off  # 3+3+3+12+12+2 = 35
+AMP_OBS_DIM: int = _off  # 3+3+3+12+12+2 = 35 (single-step feature)
+AMP_NUM_OBS_STEPS: int = 10  # number of stacked steps (official AMP default)
+AMP_DISC_DIM: int = AMP_OBS_DIM * AMP_NUM_OBS_STEPS  # 350 (discriminator input)
 
 
 # --------------------------------------------------------------------------- #
@@ -231,6 +233,21 @@ class MotionLib:
                 root_t[i + 1], root_t[i], root_q[i + 1], root_q[i],
                 joints[i + 1], joints[i],
                 contact[i + 1], contact[i], dt)
+        # Build 10-step sliding window features for the discriminator (350-dim)
+        # Each row = concatenation of 10 consecutive single-step features.
+        # This gives the discriminator temporal context, matching official AMP.
+        n_single = amp.shape[0]
+        if n_single >= AMP_NUM_OBS_STEPS:
+            amp_stacked = np.zeros((n_single - AMP_NUM_OBS_STEPS + 1, AMP_DISC_DIM), dtype=np.float64)
+            for i in range(AMP_NUM_OBS_STEPS - 1, n_single):
+                window = amp[i - AMP_NUM_OBS_STEPS + 1 : i + 1].flatten()
+                amp_stacked[i - AMP_NUM_OBS_STEPS + 1] = window
+            amp = amp_stacked
+        else:
+            # Clip too short: pad with first row
+            amp = np.zeros((1, AMP_DISC_DIM), dtype=np.float64)
+            padded = np.vstack([np.zeros((AMP_NUM_OBS_STEPS - n_single, AMP_OBS_DIM)), amp[:n_single]])
+            amp[0] = padded.flatten()
         joint_ok = _check_joint_ranges(joints)
         stats = ClipStats(
             n_frames=N, fps=new_fps, dt=dt,
@@ -248,7 +265,7 @@ class MotionLib:
         return self._n
 
     def sample_expert(self, batch_size: int):
-        """Return (batch_size, AMP_OBS_DIM) expert minibatch as torch tensor."""
+        """Return (batch_size, AMP_DISC_DIM) expert minibatch as torch tensor."""
         if torch is None:
             raise RuntimeError("torch required to sample expert minibatches")
         idx = np.random.randint(0, max(self._n, 1), size=batch_size)

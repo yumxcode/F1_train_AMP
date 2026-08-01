@@ -19,7 +19,7 @@ from collections import deque
 from datetime import datetime
 
 from ..ppo.dh_on_policy_runner import DHOnPolicyRunner
-from .motion_lib import MotionLib, AMP_OBS_DIM
+from .motion_lib import MotionLib, AMP_OBS_DIM, AMP_DISC_DIM, AMP_NUM_OBS_STEPS
 from .discriminator import Discriminator, compute_disc_loss
 from .replay_buffer import AMPReplayBuffer
 
@@ -35,7 +35,7 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         self.disc_gp = float(amp_cfg.get("disc_grad_penalty_coef", 5.0))
         self.ema_decay = float(amp_cfg.get("expert_logit_ema_decay", 0.95))
 
-        disc_dim = int(amp_cfg.get("disc_input_dim", AMP_OBS_DIM))
+        disc_dim = int(amp_cfg.get("disc_input_dim", AMP_DISC_DIM))  # 350 (10-step stacked)
         disc_hid = amp_cfg.get("disc_hidden_dims", [1024, 512])
         self.disc = Discriminator(disc_dim, hidden_dims=disc_hid).to(self.device)
         self.disc_optimizer = torch.optim.Adam(self.disc.parameters(), lr=self.disc_lr)
@@ -61,15 +61,20 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         self.register_buffer_compat = None
         self.expert_logit_ema = torch.tensor(float(amp_cfg.get("expert_logit_ema_init", 0.0)), device=self.device)
 
-        # smoke-sanity: env must expose the AMP feature builder with matching dim
+        # Policy-side 10-step history buffer for building stacked disc features.
+        # compute_amp_obs() returns (N, 35) per step; we stack 10 consecutive steps.
+        self.num_obs_steps = AMP_NUM_OBS_STEPS
+        self._amp_history = None  # will be initialized as (N, num_steps, 35) on first call
+
+        # smoke-sanity: env must expose the AMP feature builder
         if not hasattr(self.env, "compute_amp_obs"):
             raise RuntimeError("AMP env must implement compute_amp_obs() -> (N, F) tensor")
         with torch.no_grad():
             _probe = self.env.compute_amp_obs()
-        assert _probe.shape[-1] == disc_dim, (
-            f"env amp_obs dim {_probe.shape[-1]} != disc input dim {disc_dim}; "
-            "expert/policy schema mismatch (see data/amp_contract.md §2)")
-        print(f"[AMP] disc_input_dim={disc_dim} style_weight={self.style_weight} "
+        assert _probe.shape[-1] == AMP_OBS_DIM, (
+            f"env amp_obs dim {_probe.shape[-1]} != single-step AMP_OBS_DIM {AMP_OBS_DIM}; "
+            "expert/policy schema mismatch")
+        print(f"[AMP] disc_input_dim={disc_dim} (10-step stacked) style_weight={self.style_weight} "
               f"expert_clips={len(clip_paths)} expert_samples={self.motion_lib.num_samples if self.motion_lib else 0}")
 
     # ------------------------------------------------------------------ #
@@ -143,13 +148,31 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         self.save(os.path.join(self.log_dir, "model_{}.pt".format(self.current_learning_iteration)))
 
     # ------------------------------------------------------------------ #
+    def _build_stacked_amp(self, single_step: torch.Tensor) -> torch.Tensor:
+        """Build 10-step stacked AMP feature from single-step (N, 35) → (N, 350).
+        
+        Maintains a rolling history buffer of the last 10 steps.
+        """
+        N = single_step.shape[0]
+        if self._amp_history is None:
+            # Initialize history with zeros
+            self._amp_history = torch.zeros(N, self.num_obs_steps, AMP_OBS_DIM, device=self.device)
+        # Shift history: drop oldest, append newest
+        self._amp_history = torch.cat([
+            self._amp_history[:, 1:, :],
+            single_step.unsqueeze(1)
+        ], dim=1)
+        # Flatten to (N, 350)
+        return self._amp_history.reshape(N, -1)
+
     @torch.no_grad()
     def _add_style_reward(self, rewards: torch.Tensor) -> torch.Tensor:
         if self.motion_lib is None:
             return rewards
-        policy_amp = self.env.compute_amp_obs()
-        self.policy_amp_buffer.add(policy_amp)
-        d_p = self.disc(policy_amp)
+        policy_amp = self.env.compute_amp_obs()  # (N, 35)
+        stacked = self._build_stacked_amp(policy_amp)  # (N, 350)
+        self.policy_amp_buffer.add(stacked)
+        d_p = self.disc(stacked)
         style_r = self.disc.compute_reward(d_p, self.expert_logit_ema)
         return rewards + self.style_weight * style_r
 

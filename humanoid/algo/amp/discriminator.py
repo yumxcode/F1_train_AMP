@@ -32,26 +32,20 @@ class Discriminator(nn.Module):
 
     def compute_reward(self, policy_logit: torch.Tensor, expert_logit_ema: torch.Tensor,
                        reward_clamp: float = 2.0) -> torch.Tensor:
-        """AMP style reward (Peng et al. 2021 ASE/AMP formulation).
+        """Official AMP style reward (Peng et al. 2021).
 
-        Uses exp(-0.25 * max(0, ema_e - p_logit)) which NEVER collapses to zero even
-        when the discriminator dominates. This preserves a non-trivial gradient when
-        the policy is far from expert (prevents the "dead style reward" failure mode
-        observed in iter-1 training where the clamped linear reward hit exactly 0).
+        r = -log(max(1 - sigmoid(D(p)), 1e-4)) * reward_scale
 
-        r = exp(-0.25 * max(0, ema(D(e)) - D(p)))
+        This is the standard AMP reward formula. Unlike exp-floor which gives a constant
+        ~0.015 regardless of policy behavior, this formula gives:
+          * policy fools D -> D(p)>0 -> sigmoid→1 -> r→0 (no reward for fooling)
+          * policy matches expert -> D(p)~0 -> sigmoid=0.5 -> r≈0.69
+          * policy clearly fake -> D(p)<<0 -> sigmoid→0 -> r large but clamped
 
-        Checks:
-          * policy == expert  -> D(p) ~ D(e)        -> r ~ 1.0
-          * policy clearly fake -> D(p) -> -inf     -> r -> exp(-inf) -> 0 (but never EXACTLY 0)
-          * policy fools D     -> D(p) > D(e)       -> r ~ 1.0 (capped)
-
-        The previous linear-clamp formula r=clamp(1-0.25*(ema-p),0,2) clamped to exactly
-        0 when the logit gap exceeded 4 (observed at iter ~100), killing the style
-        gradient entirely. The exponential formulation preserves gradient everywhere.
+        The key difference from exp-floor: reward RESPONDS to D(p) changes.
         """
-        logit_diff = torch.clamp(expert_logit_ema - policy_logit.squeeze(-1), min=0.0)
-        r = torch.exp(-0.25 * logit_diff)
+        prob = torch.sigmoid(policy_logit.squeeze(-1))
+        r = -torch.log(torch.clamp(1.0 - prob, min=1e-4))
         return r.clamp(0.0, reward_clamp)
 
 

@@ -53,10 +53,11 @@ class X1AMPCfgPPO(X1DHStandCfgPPO):
         resume_path = None
 
     class amp:
-        # Original v2 AMP config (restored from 427345e5 — the only config that produced stable walking).
-        # Disc saturates (acc→1.0) but style_reward stays bounded via exp-floor, not interfering
-        # with task reward. v4-v6 attempts to fix disc saturation ALL broke walking performance.
-        disc_input_dim = AMP_OBS_DIM
+        # v9: 10-step stacked AMP obs (350-dim) to break discriminator saturation.
+        # Expert/policy both produce 350-dim features (10×35). Official AMP uses this approach.
+        # v2 config otherwise: GP=5, style_w=1.0, exp-floor reward, tracking=1.5.
+        from humanoid.algo.amp.motion_lib import AMP_DISC_DIM as _DISC_DIM
+        disc_input_dim = _DISC_DIM  # 350 (10-step stacked)
         disc_hidden_dims = [1024, 512]
         disc_lr = 5e-5
         disc_grad_penalty_coef = 5.0
