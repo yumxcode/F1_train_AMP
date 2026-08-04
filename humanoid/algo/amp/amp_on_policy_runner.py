@@ -33,7 +33,11 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         self.disc_batch = int(amp_cfg.get("disc_batch_size", 4096))
         self.disc_lr = float(amp_cfg.get("disc_lr", 1e-4))
         self.disc_gp = float(amp_cfg.get("disc_grad_penalty_coef", 5.0))
+        self.disc_update_interval = int(amp_cfg.get("disc_update_interval", 2))  # train disc every N iters
         self.ema_decay = float(amp_cfg.get("expert_logit_ema_decay", 0.95))
+        self._last_disc_metrics = {"disc_loss": 0.0, "disc_acc": 0.0, "expert_logit": 0.0,
+                                   "policy_logit": 0.0, "style_reward": 0.0, "grad_penalty": 0.0,
+                                   "expert_loss": 0.0, "policy_loss": 0.0}
 
         disc_dim = int(amp_cfg.get("disc_input_dim", AMP_DISC_DIM))  # 350 (10-step stacked)
         disc_hid = amp_cfg.get("disc_hidden_dims", [1024, 512])
@@ -134,8 +138,8 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
                 self.alg.compute_returns(critic_obs)
 
             mean_value_loss, mean_surrogate_loss, mean_state_estimator_loss = self.alg.update()
-            # === AMP: train discriminator once per iteration ===
-            disc_metrics = self._train_discriminator()
+            # === AMP: train discriminator every N iterations to give policy time to catch up ===
+            disc_metrics = self._train_discriminator() if it % self.disc_update_interval == 0 else self._last_disc_metrics
             learn_time = time.time() - start
             if self.log_dir is not None:
                 self.log(locals())          # PPO console + tensorboard logging (parent)
@@ -200,6 +204,7 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         with torch.no_grad():
             d_p = self.disc(self.policy_amp_buffer.sample(min(self.disc_batch, max(self.policy_amp_buffer.size, 1))))
             metrics_acc["style_reward"] = float(self.disc.compute_reward(d_p, self.expert_logit_ema).mean())
+        self._last_disc_metrics = metrics_acc
         return metrics_acc
 
     def _log_amp(self, locs, dm):

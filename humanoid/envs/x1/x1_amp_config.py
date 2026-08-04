@@ -60,7 +60,8 @@ class X1AMPCfgPPO(X1DHStandCfgPPO):
         disc_input_dim = _DISC_DIM  # 350 (10-step stacked)
         disc_hidden_dims = [1024, 512]
         disc_lr = 5e-5
-        disc_grad_penalty_coef = 10.0    # 5->10: stronger R1 on real samples (v9 with 5 saturated at iter 34)
+        disc_grad_penalty_coef = 20.0    # 10->20: stronger R1 to delay saturation further
+        disc_update_interval = 2         # train disc every 2 PPO iters (give policy time to catch up)
         disc_train_iters = 1
         disc_batch_size = 4096
         style_weight = 1.0
