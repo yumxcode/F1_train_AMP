@@ -189,13 +189,13 @@ class X1DHStandCfg(LeggedRobotCfg):
         friction_range = [0.2, 2.2]
         restitution_range = [0.0, 0.4]
 
-        # push
+        # push — reduced for better velocity tracking (was 0.3 m/s)
         push_robots = True
-        push_interval_s = 4 # every this second, push robot
+        push_interval_s = 6 # 4 -> 6: less frequent
         update_step = 2000 * 24 # after this count, increase push_duration index
         push_duration = [0, 0.05, 0.1, 0.15, 0.2, 0.25] # increase push duration during training
-        max_push_vel_xy = 0.3
-        max_push_ang_vel = 0.3
+        max_push_vel_xy = 0.15  # 0.3 -> 0.15: halve disturbance for speed tracking
+        max_push_ang_vel = 0.15  # 0.3 -> 0.15
 
         randomize_base_mass = True
         added_mass_range = [-5, 5] # base mass rand range, base mass is all fix link sum mass
@@ -355,7 +355,7 @@ class X1DHStandCfg(LeggedRobotCfg):
             # 跟踪奖励调低，避免策略靠拖脚拿到全部收益
             tracking_lin_vel = 2.5          # 4.0 → 2.5 ⬇️
             tracking_ang_vel = 1.0
-            track_vel_hard = 0.3
+            track_vel_hard = 1.0   # 0.3 -> 1.0: stronger velocity tracking incentive
             vel_mismatch_exp = 0.5
             low_speed = 0.3
             stride_length = 0.25

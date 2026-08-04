@@ -51,22 +51,22 @@ class Discriminator(nn.Module):
 
 def compute_disc_loss(disc: Discriminator, expert: torch.Tensor, policy: torch.Tensor,
                       grad_penalty_coef: float = 5.0) -> Dict[str, torch.Tensor]:
-    """AMP discriminator loss following official NVIDIA AMP.
+    """AMP discriminator loss + gradient penalty on policy samples.
 
-    Loss = softplus(-D(e)) + softplus(D(p))    [BCE with logits]
-         + grad_penalty_coef * mean(||grad_x D(expert)||^2)   [R1 on REAL, official]
+    Returns dict with loss, expert_loss, policy_loss, accuracy, expert_logit, policy_logit,
+    grad_penalty.
     """
     d_e = disc(expert)
     d_p = disc(policy)
     expert_loss = nn.functional.softplus(-d_e).mean()
     policy_loss = nn.functional.softplus(d_p).mean()
-    # R1 gradient penalty on EXPERT/real samples (official AMP: real-only)
+    # gradient penalty on policy samples (R1-style on the fake distribution)
     grad_penalty = torch.tensor(0.0, device=expert.device)
     if grad_penalty_coef > 0:
-        expert_g = expert.detach().requires_grad_(True)
-        d_eg = disc(expert_g)
+        policy_g = policy.detach().requires_grad_(True)
+        d_pg = disc(policy_g)
         grads = torch.autograd.grad(
-            outputs=d_eg.sum(), inputs=expert_g,
+            outputs=d_pg.sum(), inputs=policy_g,
             create_graph=True, retain_graph=True, only_inputs=True)[0]
         grad_penalty = (grads.pow(2).reshape(grads.shape[0], -1).sum(-1)).mean()
     loss = expert_loss + policy_loss + grad_penalty_coef * grad_penalty
