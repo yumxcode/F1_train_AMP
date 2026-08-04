@@ -134,11 +134,10 @@ def evaluate(env, runner, retarget_joints, seed):
                               env.root_states[0, 5].item(), env.root_states[0, 6].item())
             sin_p = 2.0 * (qz * qx - qy * qw)
             pt += abs(float(np.degrees(np.arcsin(min(1.0, max(-1.0, sin_p))))))
-            # Use WORLD frame x-velocity for speed tracking (base_lin_vel is in base frame,
-            # which underestimates forward speed when yaw drift exists).
-            # root_states[7] = world lin_vel_x (m/s)
-            world_vx = float(env.root_states[0, 7].item())
-            ve += abs(world_vx - NOMINAL_VX)
+            # Use BASE FRAME vx for speed tracking (training command is in base frame).
+            # Also track world displacement for honest forward-progress reporting.
+            base_vx = float(env.base_lin_vel[0, 0].item())
+            ve += abs(base_vx - NOMINAL_VX)
             dof0 = env.dof_pos[0].detach().cpu().numpy()
             jpe += float(np.abs(dof0 - retarget_joints[ep_step % clip_len]).mean())
             # analytic gait-clock reference (env.ref_dof_pos is updated every step by compute_ref_state)

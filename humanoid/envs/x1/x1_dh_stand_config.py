@@ -314,7 +314,7 @@ class X1DHStandCfg(LeggedRobotCfg):
                            "stand": [2,3],
                            "walk_omnidirectional": [3,5]}
 
-        heading_command = False  # if true: compute ang vel command from heading error
+        heading_command = True   # False -> True: compute ang_vel from heading error → policy learns to walk straight
         stand_com_threshold = 0.05 # if (lin_vel_x, lin_vel_y, ang_vel_yaw).norm < this, robot should stand
         sw_switch = True # use stand_com_threshold or not
 
