@@ -341,7 +341,7 @@ class X1DHStandCfg(LeggedRobotCfg):
         target_feet_height = 0.06       # 0.04 → 0.06
         target_feet_height_max = 0.10   # 0.07 → 0.10 放宽上限
         feet_to_ankle_distance = 0.041
-        cycle_time = 0.8                # 1.0 -> 0.8: faster gait → higher max speed (stride/dt)
+        cycle_time = 1.0                # v15 with 0.8 broke speed tracking; revert to 1.0
         stride_length_target = 0.36
         toe_scuff_height = 0.04         # 0.035 → 0.04 防拖脚
         # if true negative total rewards are clipped at zero (avoids early termination problems)
