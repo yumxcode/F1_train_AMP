@@ -209,7 +209,8 @@ def evaluate(env, runner, retarget_joints, seed):
         metrics["fall"].append(1)
         metrics["ep_len"].append(0)
         for k in ["vx_err", "base_h", "pitch", "jp_err", "jp_err_analytic",
-                  "lateral_drift", "yaw_drift", "contact_l", "contact_r"]:
+                  "lateral_drift", "yaw_drift", "contact_l", "contact_r",
+                  "world_disp_m", "world_speed_mps", "world_speed_track_pct"]:
             metrics[k].append(0.0)
         metrics["dof_viol"].append(0)
     return metrics
