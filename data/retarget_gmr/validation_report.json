@@ -81,7 +81,7 @@
       "detail": "min=-0.000"
     },
     {
-      "name": "foot penetration < 5% frames",
+      "name": "foot penetration < 5mm in all frames",
       "pass": true,
       "detail": "penetration_frames=0/337"
     },
@@ -106,9 +106,14 @@
       "detail": "min_knee_z=0.309"
     },
     {
-      "name": "loop joint continuity (dof diff < 1.0 rad)",
+      "name": "support foot slip < 0.1 m/s (root-relative, stance)",
+      "pass": false,
+      "detail": "slip_violations=445/445 stance_frames, max_slip=2.464m/s"
+    },
+    {
+      "name": "no self-collision (non-ground body contacts)",
       "pass": true,
-      "detail": "max_dof_diff=0.549"
+      "detail": "self_collision_frames=0/337"
     },
     {
       "name": "both feet have contact frames",
@@ -119,9 +124,59 @@
       "name": "not always double-support (< 90%)",
       "pass": true,
       "detail": "double_support_frames=119/337"
+    },
+    {
+      "name": "left stance fraction matches reference (diff<0.2)",
+      "pass": true,
+      "detail": "ref=0.60 clip=0.61 diff=0.01"
+    },
+    {
+      "name": "right stance fraction matches reference (diff<0.2)",
+      "pass": false,
+      "detail": "ref=0.00 clip=0.74 diff=0.74"
+    },
+    {
+      "name": "left step frequency matches reference (ratio>0.5)",
+      "pass": true,
+      "detail": "ref=2.4/s clip=2.7/s ratio=0.89"
+    },
+    {
+      "name": "right step frequency matches reference (ratio>0.5)",
+      "pass": false,
+      "detail": "ref=0.0/s clip=3.3/s ratio=0.00"
+    },
+    {
+      "name": "loop position continuity (xy diff < 0.5m)",
+      "pass": false,
+      "detail": "xy_diff=3.043m"
+    },
+    {
+      "name": "loop orientation continuity (quat diff < 0.5)",
+      "pass": true,
+      "detail": "quat_diff=0.305"
+    },
+    {
+      "name": "loop velocity continuity (diff < 1.0 m/s)",
+      "pass": true,
+      "detail": "vel_diff=0.524m/s"
+    },
+    {
+      "name": "loop joint continuity (dof diff < 1.0 rad)",
+      "pass": true,
+      "detail": "max_dof_diff=0.549"
+    },
+    {
+      "name": "loop contact continuity (no contact state change)",
+      "pass": false,
+      "detail": "contact_first=[1.0, 0.0] contact_last=[0.0, 1.0]"
+    },
+    {
+      "name": "clip loopable (strict all criteria)",
+      "pass": false,
+      "detail": "loopable=False"
     }
   ],
-  "pass": true,
+  "pass": false,
   "summary": {
     "frames": 337,
     "fps": 100.0,
@@ -132,7 +187,11 @@
       0.5792994378284563,
       0.6404803455599754
     ],
-    "n_pass": 24,
-    "n_total": 24
+    "loopable": false,
+    "max_slip_mps": 2.4637790725748965,
+    "self_collision_frames": 0,
+    "penetration_frames": 0,
+    "n_pass": 29,
+    "n_total": 35
   }
 }
