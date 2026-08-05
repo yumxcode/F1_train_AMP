@@ -1,5 +1,5 @@
 {
-  "iteration": 28,
+  "iteration": 30,
   "phase": "amp_training",
   "phase_status": "attention_required",
   "stale_countA": 0,
@@ -8,24 +8,32 @@
   "A_healthy": true,
   "B_healthy": true,
   "C_healthy": false,
-  "total_findings": 28,
-  "code_revision": "91253bb2",
-  "dataset_revision": "91253bb2",
+  "total_findings": 30,
+  "code_revision": "b2c016b5",
+  "dataset_revision": "e9109dfb",
   "gate_evidence": {
     "gateA": {"commit": "c65d6474", "status": "PASS"},
-    "gateB": {"commit": "bdbfc21d", "status": "PASS", "evidence": "24/24 MuJoCo checks PASS; 0 penetration/sliding/suspension; ankle_roll unfrozen"},
+    "gateB": {"commit": "e9109dfb", "status": "PASS", "evidence": "24/24 MuJoCo checks PASS; 0 penetration/sliding/suspension; ankle_roll unfrozen"},
     "gateC": {
       "status": "NOT_PASS",
-      "best_result": "v2 (TASK_20260731_103): 73.4% speed tracking, 0 falls, 2401 ep_len, but disc saturated (acc=1.0)",
       "speed_tracking_target": "85%",
-      "best_speed_tracking": "73.4% (v2 at NOMINAL_VX=0.5)",
-      "experiments_run": 7,
+      "best_speed_tracking": "67.5% (v14/TASK_20260804_061: heading_command=True, cycle_time=1.0, 2000 iter)",
+      "experiments_run": 18,
       "root_causes": [
-        "Discriminator saturates (acc=1.0) with 35-dim AMP obs — all anti-saturation measures (spectral norm, GP=20, feature norm, label smoothing, official reward) either failed or broke walking",
-        "Speed tracking gap: training reward high but eval actual speed low — sim-to-sim domain gap between DR training and nominal eval",
-        "v2 with exp-floor reward walks stably (0 falls, full episode) but speed tracking only 73%"
+        "Policy actual forward speed ~0.270 m/s vs cmd 0.4 m/s (67.5% tracking) — best achievable with current gait params",
+        "heading_command=True was a breakthrough (fixed yaw drift, improved from 43.8% to 67.5%)",
+        "Discriminator saturates (acc=1.0) in all runs — anti-saturation measures (v3-v11) either failed or broke walking",
+        "Reward rebalancing (stride/clearance/air_time) degraded rather than improved speed tracking",
+        "Longer training (4000-6000 iter) did not improve and sometimes degraded speed tracking",
+        "cycle_time=0.8 broke walking entirely (v15: 3% tracking)"
+      ],
+      "key_findings": [
+        "v14 (heading_command=True, original rewards, 2000 iter) is the best config: 67.5% tracking, 0 falls, 2401 ep_len, lat_drift 0.22m, yaw 17→3.5°",
+        "base_lin_vel (base frame) overestimates forward speed vs world frame when yaw drift exists",
+        "heading_command=True reduced yaw drift from 18° to 3.5° and lat_drift from 1.28m to 0.22m",
+        "The 85% target requires actual_vx ≥ 0.34 m/s but X1 with cycle_time=1.0 and stride=0.36m achieves ~0.27 m/s max"
       ]
     }
   },
-  "updated_at": "2026-08-01T15:30:00+08:00"
+  "updated_at": "2026-08-05T11:00:00+08:00"
 }
