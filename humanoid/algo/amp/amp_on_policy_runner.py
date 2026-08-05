@@ -36,7 +36,7 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         self.disc_lr = float(amp_cfg.get("disc_lr", 1e-4))
         self.disc_gp = float(amp_cfg.get("disc_grad_penalty_coef", 5.0))
         self.ema_decay = float(amp_cfg.get("expert_logit_ema_decay", 0.95))
-        self._last_disc_metrics = {"disc_loss": 0.0, "disc_acc": 0.0, "expert_logit": 0.0,
+        self._last_disc_metrics = {"loss": 0.0, "accuracy": 0.0, "expert_logit": 0.0,
                                    "policy_logit": 0.0, "style_reward": 0.0, "grad_penalty": 0.0,
                                    "expert_loss": 0.0, "policy_loss": 0.0}
 
