@@ -144,8 +144,13 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
                 self.alg.compute_returns(critic_obs)
 
             mean_value_loss, mean_surrogate_loss, mean_state_estimator_loss = self.alg.update()
-            # === AMP: train discriminator once per iteration ===
-            disc_metrics = self._train_discriminator()
+            # === AMP: train discriminator only after warmup (gate disc training to style_weight curriculum) ===
+            # During warmup (style_weight=0), disc is NOT trained. This prevents saturation
+            # when expert/policy distributions are trivially separable at init.
+            if effective_style_weight > 0.01:
+                disc_metrics = self._train_discriminator()
+            else:
+                disc_metrics = self._last_disc_metrics  # reuse last (or initial zeros)
             learn_time = time.time() - start
             if self.log_dir is not None:
                 self.log(locals())          # PPO console + tensorboard logging (parent)
