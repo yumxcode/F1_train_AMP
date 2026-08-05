@@ -101,13 +101,15 @@ def evaluate(env, runner, retarget_joints, seed):
     # lateral_drift / yaw_drift = frozen task_spec walking-task metrics (not previously measured).
     metrics = {k: [] for k in ["fall", "ep_len", "vx_err", "base_h", "pitch",
                                "jp_err", "jp_err_analytic", "lateral_drift", "yaw_drift",
-                               "dof_viol", "contact_l", "contact_r"]}
+                               "dof_viol", "contact_l", "contact_r",
+                               "world_disp_m", "world_speed_mps", "world_speed_track_pct"]}
 
     episodes_done = 0
     warming = True            # discard the first (warm-up) episode boundary for env[0]
     ep_step = 0
     bh = pt = ve = jpe = jpe_an = lat = yaw = cl = cr = 0.0
     init_x = init_y = None
+    ep_start_x = None  # track world x displacement per episode
     viol = 0
     # Per-episode step budget: if env[0] does NOT terminate within (2 * nominal episode length),
     # something is pathological (stuck-but-not-terminated) -> force-count it as a completed episode
@@ -161,9 +163,7 @@ def evaluate(env, runner, retarget_joints, seed):
             cr += float((cf[0, 1] > 5.0).item())
             viol += int(((dof0 < lims[:, 0]) | (dof0 > lims[:, 1])).sum())
 
-            # Episode boundary = env reset OR per-episode budget exceeded (anti-hang: a stuck-but-
-            # not-terminated env[0] would otherwise loop forever and stall the whole eval, as seen
-            # when TASK_049/059 hung for hours between seeds). Budget-exceeded counts as a timeout.
+            # Episode boundary = env reset OR per-episode budget exceeded
             ep_boundary = bool(reset_buf[0].item()) or (ep_step >= ep_budget)
             if ep_boundary:
                 if warming:
@@ -183,11 +183,26 @@ def evaluate(env, runner, retarget_joints, seed):
                     metrics["dof_viol"].append(viol)
                     metrics["contact_l"].append(cl / max(ep_step, 1))
                     metrics["contact_r"].append(cr / max(ep_step, 1))
+                    # World displacement-based speed (ground truth forward progress)
+                    cur_x = float(env.root_states[0, 0].item())
+                    if ep_start_x is not None:
+                        disp = abs(cur_x - ep_start_x)
+                        ep_time = ep_step * dt
+                        world_speed = disp / max(ep_time, 1e-6)
+                        metrics["world_disp_m"].append(disp)
+                        metrics["world_speed_mps"].append(world_speed)
+                        metrics["world_speed_track_pct"].append(
+                            max(0.0, (1.0 - abs(world_speed - NOMINAL_VX) / NOMINAL_VX) * 100.0))
+                    else:
+                        metrics["world_disp_m"].append(0.0)
+                        metrics["world_speed_mps"].append(0.0)
+                        metrics["world_speed_track_pct"].append(0.0)
                     episodes_done += 1
                 ep_step = 0
                 bh = pt = ve = jpe = jpe_an = lat = yaw = cl = cr = 0.0
                 viol = 0
                 init_x = init_y = None
+                ep_start_x = float(env.root_states[0, 0].item())  # reset for next episode
 
     if episodes_done == 0:
         # degenerate: never crossed an episode boundary (instant fall loop) -> record a hard fall
@@ -326,6 +341,9 @@ def main():
         "base_pitch_deg": agg("pitch"), "joint_pos_err_ref_rad": agg("jp_err"),
         "joint_pos_err_analytic_rad": agg("jp_err_analytic"),
         "lateral_drift_m": agg("lateral_drift"), "yaw_drift_deg": agg("yaw_drift"),
+        "world_displacement_m": agg("world_disp_m"),
+        "world_speed_mps": agg("world_speed_mps"),
+        "world_speed_track_pct": agg("world_speed_track_pct"),
         "dof_limit_viol_total": int(sum(int(np.sum(all_results[sd]["dof_viol"]))
                                         for sd in EVAL_SEEDS if all_results[sd] is not None)),
         "foot_contact_l_frac": agg("contact_l"), "foot_contact_r_frac": agg("contact_r"),
@@ -342,6 +360,9 @@ def main():
           f"base_h={report['base_height_m']['mean']:.3f} "
           f"lat_drift={report['lateral_drift_m']['mean']:.3f} "
           f"yaw_drift={report['yaw_drift_deg']['mean']:.1f} "
+          f"world_disp={report['world_displacement_m']['mean']:.2f}m "
+          f"world_speed={report['world_speed_mps']['mean']:.3f}m/s "
+          f"world_track={report['world_speed_track_pct']['mean']:.1f}% "
           f"dof_viol={report['dof_limit_viol_total']}")
 
     # === Sim2Sim deployability check (Gate-C §6.4) ===
