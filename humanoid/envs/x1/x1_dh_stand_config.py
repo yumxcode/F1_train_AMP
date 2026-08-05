@@ -358,10 +358,10 @@ class X1DHStandCfg(LeggedRobotCfg):
             track_vel_hard = 1.0   # 0.3 -> 1.0: stronger velocity tracking incentive
             vel_mismatch_exp = 0.5
             low_speed = 0.3
-            stride_length = 0.25
-            # gait — 大幅提升，直接激励抬脚
-            feet_clearance = 3.0            # 0.50 → 3.0 🔺 抬脚核心激励
-            feet_air_time = 8.0             # 5.0 → 8.0 🔺
+            stride_length = 1.0            # 0.25 -> 1.0: strongly reward forward stride
+            # gait — moderate, not dominating
+            feet_clearance = 1.0            # 3.0 -> 1.0: was too high, making policy prioritize height over speed
+            feet_air_time = 3.0             # 8.0 -> 3.0: was too high, keeping feet airborne too long
             feet_contact_number = 0.8
             foot_slip = -0.20
             toe_scuff = -0.5
