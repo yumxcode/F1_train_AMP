@@ -351,53 +351,49 @@ class X1DHStandCfg(LeggedRobotCfg):
         max_contact_force = 700  # forces above this value are penalized
         
         class scales:
-            # === Aligned with Roboparty RPO AMP reference project ===
-            # Reference uses minimal task rewards + AMP for style.
-            # We remove extra gait-shaping rewards (feet_clearance/air_time/stride/low_speed/stand_still)
-            # that were competing with AMP and distorting velocity tracking.
+            # v21: restore v14 proven gait rewards (feet_clearance/air_time) which are
+            # necessary because our AMP is saturated (single clip → disc trivially separates).
+            # Reference project can disable these because their AMP WORKS (8 diverse clips).
+            # Once we add more clips and AMP works, these can be removed per reference.
             
-            # -- Task (reference: track_lin_vel=1.25, track_ang_vel=1.25)
-            tracking_lin_vel = 1.25          # aligned with reference
-            tracking_ang_vel = 1.25          # aligned with reference
-            track_vel_hard = 0.0             # disabled (not in reference)
-            vel_mismatch_exp = 0.0           # disabled (not in reference)
-            low_speed = 0.0                 # disabled (not in reference)
-            stride_length = 0.0             # disabled (not in reference)
+            # -- Task (aligned with reference: track_vel=1.25)
+            tracking_lin_vel = 1.25
+            tracking_ang_vel = 1.0
+            track_vel_hard = 0.0
+            vel_mismatch_exp = 0.0
+            low_speed = 0.0
+            stride_length = 0.0
             
-            # -- Gait shaping: DISABLED (reference uses AMP for this)
-            feet_clearance = 0.0            # disabled — AMP handles foot lift
-            feet_air_time = 0.0             # disabled — AMP handles swing timing
-            feet_contact_number = 0.0       # disabled
-            foot_slip = -0.1                # aligned with reference (-0.1)
-            toe_scuff = 0.0                 # disabled
+            # -- Gait shaping (REQUIRED until AMP works — ref disables these)
+            feet_clearance = 1.5            # 3.0→1.5: moderate, not dominating
+            feet_air_time = 4.0             # 8.0→4.0: moderate
+            feet_contact_number = 0.5
+            foot_slip = -0.1                # aligned with reference
+            toe_scuff = 0.0
             feet_distance = 0.05            # aligned with reference
-            knee_distance = 0.0             # disabled (not in reference)
-            feet_rotation = 0.0             # disabled
+            knee_distance = 0.0
+            feet_rotation = 0.0
             
-            # -- Base link (reference: flat_orientation=-1.2, ang_vel_xy=-0.1)
-            default_joint_pos = 0.0         # disabled — reference uses joint_regularization=0
-            orientation = 1.2               # aligned (reference flat_orientation_l2 weight=1.2, we use exp)
-            base_height = 0.0               # disabled (not in reference)
-            base_acc = 0.0                  # disabled
+            # -- Base link (aligned with reference)
+            default_joint_pos = 0.0
+            orientation = 1.2               # aligned (ref flat_orientation_l2=-1.2)
+            base_height = 0.0
+            base_acc = 0.0
+            ref_joint_pos = 0.0
             
-            # -- Joint (reference values)
-            ref_joint_pos = 0.0             # disabled — AMP handles style
-            action_smoothness = -0.01       # aligned (reference action_rate_l2=-0.01)
-            torques = -1e-5                 # aligned (reference joint_torques_l2=-1e-5)
-            dof_vel = -2e-4                 # aligned (reference joint_vel_l2=-2e-4)
-            dof_acc = -2.5e-7               # aligned (reference joint_acc_l2=-2.5e-7)
-            collision = -10.0               # aligned (reference undesired_contacts=-10)
-            stand_still = 0.0               # disabled (not in reference)
-            
-            # -- Ankle
-            ankle_torques = 0.0             # disabled
-            ankle_motion = 0.0              # disabled
-            
-            # -- Limits
-            dof_vel_limits = 0.0            # disabled (not in reference)
-            dof_pos_limits = -1.0           # aligned (reference joint_pos_limits=-1.0)
-            dof_torque_limits = 0.0         # disabled
-            feet_contact_forces = 0.0       # disabled
+            # -- Joint (aligned with reference)
+            action_smoothness = -0.01       # ref action_rate_l2=-0.01
+            torques = -1e-5                 # ref joint_torques_l2=-1e-5
+            dof_vel = -2e-4                 # ref joint_vel_l2=-2e-4
+            dof_acc = -2.5e-7               # ref joint_acc_l2=-2.5e-7
+            collision = -10.0               # ref undesired_contacts=-10
+            stand_still = 0.0
+            ankle_torques = 0.0
+            ankle_motion = 0.0
+            dof_vel_limits = 0.0
+            dof_pos_limits = -1.0           # ref joint_pos_limits=-1.0
+            dof_torque_limits = 0.0
+            feet_contact_forces = 0.0
 
     class normalization:
         class obs_scales:
