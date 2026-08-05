@@ -53,17 +53,17 @@
     {
       "name": "forward progress > 0",
       "pass": true,
-      "detail": "dist=3.04m speed=0.90m/s"
+      "detail": "dist=4.87m speed=1.45m/s"
     },
     {
       "name": "avg speed 0.1-1.0 m/s",
-      "pass": true,
-      "detail": "speed=0.90m/s"
+      "pass": false,
+      "detail": "speed=1.45m/s"
     },
     {
       "name": "lateral drift < 0.5m",
       "pass": true,
-      "detail": "drift=0.001m"
+      "detail": "drift=0.002m"
     },
     {
       "name": "max joint velocity < 30 rad/s",
@@ -148,7 +148,7 @@
     {
       "name": "loop position continuity (xy diff < 0.5m)",
       "pass": false,
-      "detail": "xy_diff=3.043m"
+      "detail": "xy_diff=4.874m"
     },
     {
       "name": "loop orientation continuity (quat diff < 0.5)",
@@ -158,7 +158,7 @@
     {
       "name": "loop velocity continuity (diff < 1.0 m/s)",
       "pass": true,
-      "detail": "vel_diff=0.524m/s"
+      "detail": "vel_diff=0.818m/s"
     },
     {
       "name": "loop joint continuity (dof diff < 1.0 rad)",
@@ -181,8 +181,8 @@
     "frames": 337,
     "fps": 100.0,
     "duration_s": 3.37,
-    "avg_speed": 0.9029568827036891,
-    "total_distance": 3.0429646947114324,
+    "avg_speed": 1.446347042541032,
+    "total_distance": 4.874189533363278,
     "root_z_range": [
       0.5792994378284563,
       0.6404803455599754
@@ -191,7 +191,7 @@
     "max_slip_mps": 2.4637790725748965,
     "self_collision_frames": 0,
     "penetration_frames": 0,
-    "n_pass": 29,
+    "n_pass": 28,
     "n_total": 35
   }
 }

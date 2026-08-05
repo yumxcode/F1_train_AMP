@@ -253,21 +253,33 @@ def main():
     root_pos[:, 2] += height_shift
     print(f"  Height adjust: lowest_foot_z={lowest_z:.4f}, shift=+{height_shift:.4f}")
 
-    # Scale root xy by leg-length ratio to match robot walking speed.
-    # Human leg (hip→ankle) ≈ 0.716m, X1 leg ≈ 0.447m. Scale ≈ 0.624.
-    # This makes the root translation consistent with the robot's shorter stride.
-    leg_scale = 0.447 / 0.716
-    root_pos[:, 0] *= leg_scale
-    root_pos[:, 1] *= leg_scale
+    # Do NOT scale root xy — it breaks foot world positions (support foot slip).
+    # The IK already produced consistent root translations matching X1 kinematics.
 
     # Origin offset: zero first frame xy
     root_pos[:, :2] -= root_pos[0, :2]
 
+    # Note: leg_scale root xy scaling was removed — it caused massive world-frame
+    # foot slip (17+ m/s) because scaling root translation without scaling joint
+    # angles disconnects foot positions from root. The IK already produces correct
+    # root translations matching X1 kinematics.
+
     # 7. Compute foot contact (height-based heuristic, per-frame)
-    # foot_z_all was computed before height shift; apply shift for correct ground reference
-    foot_z_shifted = foot_z_all + height_shift
+    # Recompute foot z with the final root_pos (after height + origin adjustments)
+    for fi in range(N):
+        qpos = np.zeros(model.nq)
+        qpos[0:3] = root_pos[fi]
+        qpos[3:7] = qpos_arr[fi, 3:7]
+        for j, dn in enumerate(X1_DOF_NAMES):
+            if dn in dof_to_qpos:
+                qpos[dof_to_qpos[dn]] = dof_pos[fi, j]
+        data.qpos[:] = qpos
+        mujoco.mj_forward(model, data)
+        for li, fid in enumerate(foot_ids_fk):
+            if fid >= 0:
+                foot_z_all[fi, li] = data.xpos[fid][2]
     contact_threshold = ground_offset + 0.05  # foot within 5cm of ground = contact
-    foot_contact = (foot_z_shifted < contact_threshold).astype(np.float64)
+    foot_contact = (foot_z_all < contact_threshold).astype(np.float64)
     # Smooth: a single-frame spike shouldn't toggle contact
     for c in range(2):
         col = foot_contact[:, c].copy()
