@@ -29,6 +29,8 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         super().__init__(env, train_cfg, log_dir, device)
         amp_cfg = train_cfg.get("amp", {})
         self.style_weight = float(amp_cfg.get("style_weight", 1.0))
+        self.style_weight_warmup_iters = int(amp_cfg.get("style_weight_warmup_iters", 500))
+        self.style_weight_max = float(amp_cfg.get("style_weight_max", 1.0))
         self.disc_train_iters = int(amp_cfg.get("disc_train_iters", 2))
         self.disc_batch = int(amp_cfg.get("disc_batch_size", 4096))
         self.disc_lr = float(amp_cfg.get("disc_lr", 1e-4))
@@ -100,6 +102,14 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
 
         for it in range(self.current_learning_iteration, tot_iter):
             self.it = it
+            # AMP style weight curriculum: ramp from 0 to max over warmup iters.
+            # This prevents disc saturation when expert/policy distributions are trivially
+            # separable at init (single short clip vs random policy). Once the policy learns
+            # to walk (via task reward), the distributions overlap and AMP becomes meaningful.
+            if self.style_weight_warmup_iters > 0 and it < self.style_weight_warmup_iters:
+                effective_style_weight = self.style_weight_max * (it / self.style_weight_warmup_iters)
+            else:
+                effective_style_weight = self.style_weight_max
             start = time.time()
             # The inherited log() reads locs['obs_mean']/locs['obs_std'] (parent logs the
             # first num_single_obs=47 entries). The base DHOnPolicyRunner computes these before
@@ -115,7 +125,7 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
                     obs, critic_obs, rewards, dones = (obs.to(self.device), critic_obs.to(self.device),
                                                        rewards.to(self.device), dones.to(self.device))
                     # === AMP: add style reward from discriminator over policy amp_obs ===
-                    rewards = self._add_style_reward(rewards)
+                    rewards = self._add_style_reward(rewards, effective_style_weight)
                     self.alg.process_env_step(rewards, dones, infos)
 
                     if self.log_dir is not None:
@@ -166,15 +176,17 @@ class AMPOnPolicyRunner(DHOnPolicyRunner):
         return self._amp_history.reshape(N, -1)
 
     @torch.no_grad()
-    def _add_style_reward(self, rewards: torch.Tensor) -> torch.Tensor:
+    def _add_style_reward(self, rewards: torch.Tensor, sw: float = None) -> torch.Tensor:
         if self.motion_lib is None:
             return rewards
+        if sw is None:
+            sw = self.style_weight
         policy_amp = self.env.compute_amp_obs()  # (N, 35)
         stacked = self._build_stacked_amp(policy_amp)  # (N, 350)
         self.policy_amp_buffer.add(stacked)
         d_p = self.disc(stacked)
         style_r = self.disc.compute_reward(d_p, self.expert_logit_ema)
-        return rewards + self.style_weight * style_r
+        return rewards + sw * style_r
 
     def _train_discriminator(self):
         if self.motion_lib is None or self.policy_amp_buffer.size == 0:

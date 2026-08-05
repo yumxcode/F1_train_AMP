@@ -64,6 +64,12 @@ class X1AMPCfgPPO(X1DHStandCfgPPO):
         disc_train_iters = 1
         disc_batch_size = 4096
         style_weight = 1.0
+        # CRITICAL: style weight curriculum. Discriminator saturates (acc=1.0) because
+        # expert (walking at 0.9 m/s) is trivially separable from random-init policy (standing).
+        # Ramp style_weight from 0→1.0 over 500 iters so policy learns to walk via task reward
+        # FIRST, then AMP refines the style once distributions overlap.
+        style_weight_warmup_iters = 500
+        style_weight_max = 1.0
         expert_logit_ema_decay = 0.95
         expert_logit_ema_init = 0.0
         policy_buffer_capacity = 1_000_000
