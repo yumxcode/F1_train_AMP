@@ -62,8 +62,8 @@ for _name, _dim in _AMP_LAYOUT:
     AMP_BLOCKS[_name] = (_off, _off + _dim)
     _off += _dim
 AMP_OBS_DIM: int = _off  # 3+3+3+12+12+2 = 35 (single-step feature)
-AMP_NUM_OBS_STEPS: int = 10  # number of stacked steps (official AMP default)
-AMP_DISC_DIM: int = AMP_OBS_DIM * AMP_NUM_OBS_STEPS  # 350 (discriminator input)
+AMP_NUM_OBS_STEPS: int = 3  # aligned with Roboparty RPO AMP reference (AMP_NUM_STEPS=3)
+AMP_DISC_DIM: int = AMP_OBS_DIM * AMP_NUM_OBS_STEPS  # 105 (3-step stacked)
 
 
 # --------------------------------------------------------------------------- #

@@ -53,23 +53,23 @@ class X1AMPCfgPPO(X1DHStandCfgPPO):
         resume_path = None
 
     class amp:
-        # v9: 10-step stacked AMP obs (350-dim) to break discriminator saturation.
-        # Expert/policy both produce 350-dim features (10×35). Official AMP uses this approach.
-        # v2 config otherwise: GP=5, style_w=1.0, exp-floor reward, tracking=1.5.
-        from humanoid.algo.amp.motion_lib import AMP_DISC_DIM as _DISC_DIM
-        disc_input_dim = _DISC_DIM  # 350 (10-step stacked)
-        disc_hidden_dims = [1024, 512]
-        disc_lr = 5e-5
-        disc_grad_penalty_coef = 5.0
+        # Aligned with Roboparty RPO AMP reference (rpo_amp_agent_cfg.py):
+        # disc_lr=1e-4, GP=10, style_reward_scale=1.5, hidden_dims=[1024,512]
+        # AMP_NUM_STEPS=3 (reference uses 3, not 10)
+        from humanoid.algo.amp.motion_lib import AMP_OBS_DIM as _OBS_DIM
+        disc_input_dim = _OBS_DIM * 3   # 35*3=105 (reference AMP_NUM_STEPS=3, not 10)
+        disc_hidden_dims = [1024, 512]  # aligned with reference
+        disc_lr = 1e-4                   # aligned (was 5e-5)
+        disc_grad_penalty_coef = 10.0    # aligned (was 5.0)
         disc_train_iters = 1
         disc_batch_size = 4096
-        style_weight = 1.0
-        # CRITICAL: style weight curriculum. Discriminator saturates (acc=1.0) because
-        # expert (walking at 0.9 m/s) is trivially separable from random-init policy (standing).
-        # Ramp style_weight from 0→1.0 over 500 iters so policy learns to walk via task reward
-        # FIRST, then AMP refines the style once distributions overlap.
-        style_weight_warmup_iters = 500
-        style_weight_max = 1.0
+        # Style reward — aligned (reference uses 1.5)
+        style_weight = 1.5               # 1.0 -> 1.5 aligned with reference
+        style_weight_warmup_iters = 500  # curriculum: no disc during warmup
+        style_weight_max = 1.5
+        expert_logit_ema_decay = 0.95
+        expert_logit_ema_init = 0.0
+        policy_buffer_capacity = 1_000_000
         expert_logit_ema_decay = 0.95
         expert_logit_ema_init = 0.0
         policy_buffer_capacity = 1_000_000
