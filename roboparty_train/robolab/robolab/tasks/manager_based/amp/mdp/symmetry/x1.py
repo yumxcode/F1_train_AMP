@@ -6,37 +6,37 @@
 
 """Symmetry functions for X1 (29-DOF humanoid).
 
-Isaac Lab joint ordering (BFS articulation traversal):
+Runtime joint ordering (VERIFIED from gradmotion retarget run):
 [
-  'lumbar_yaw_joint',             #0   self  negate(yaw)
-  'left_hip_pitch_joint',         #1   <->2
-  'right_hip_pitch_joint',        #2   <->1
-  'lumbar_roll_joint',            #3   self  negate(roll)
-  'left_hip_roll_joint',          #4   <->5  negate
-  'right_hip_roll_joint',         #5   <->4  negate
-  'lumbar_pitch_joint',           #6   self
-  'left_hip_yaw_joint',           #7   <->8  negate
-  'right_hip_yaw_joint',          #8   <->7  negate
-  'left_shoulder_pitch_joint',    #9   <->10
-  'right_shoulder_pitch_joint',   #10  <->9
-  'left_knee_pitch_joint',        #11  <->12
-  'right_knee_pitch_joint',       #12  <->11
-  'left_shoulder_roll_joint',     #13  <->14 negate
-  'right_shoulder_roll_joint',    #14  <->13 negate
-  'left_ankle_pitch_joint',       #15  <->16
-  'right_ankle_pitch_joint',      #16  <->15
-  'left_shoulder_yaw_joint',      #17  <->18 negate
-  'right_shoulder_yaw_joint',     #18  <->17 negate
-  'left_ankle_roll_joint',        #19  <->20 negate
-  'right_ankle_roll_joint',       #20  <->19 negate
-  'left_elbow_pitch_joint',       #21  <->22
-  'right_elbow_pitch_joint',      #22  <->21
-  'left_elbow_yaw_joint',         #23  <->24 negate
-  'right_elbow_yaw_joint',        #24  <->23 negate
-  'left_wrist_pitch_joint',       #25  <->26
-  'right_wrist_pitch_joint',      #26  <->25
-  'left_wrist_roll_joint',        #27  <->28 negate
-  'right_wrist_roll_joint',       #28  <->27 negate
+  'left_hip_pitch_joint',      #0   <->1
+  'lumbar_yaw_joint',          #1   self  negate(yaw)
+  'right_hip_pitch_joint',     #2   <->0
+  'left_hip_roll_joint',       #3   <->4  negate
+  'lumbar_roll_joint',         #4   self  negate(roll)
+  'right_hip_roll_joint',      #5   <->3  negate
+  'left_hip_yaw_joint',        #6   <->8  negate
+  'lumbar_pitch_joint',        #7   self
+  'right_hip_yaw_joint',       #8   <->6  negate
+  'left_knee_pitch_joint',     #9   <->12
+  'left_shoulder_pitch_joint', #10  <->11
+  'right_shoulder_pitch_joint',#11  <->10
+  'right_knee_pitch_joint',    #12  <->9
+  'left_ankle_pitch_joint',    #13  <->16
+  'left_shoulder_roll_joint',  #14  <->15 negate
+  'right_shoulder_roll_joint', #15  <->14 negate
+  'right_ankle_pitch_joint',   #16  <->13
+  'left_ankle_roll_joint',     #17  <->20 negate
+  'left_shoulder_yaw_joint',   #18  <->19 negate
+  'right_shoulder_yaw_joint',  #19  <->18 negate
+  'right_ankle_roll_joint',    #20  <->17 negate
+  'left_elbow_pitch_joint',    #21  <->22
+  'right_elbow_pitch_joint',   #22  <->21
+  'left_elbow_yaw_joint',      #23  <->24 negate
+  'right_elbow_yaw_joint',     #24  <->23 negate
+  'left_wrist_pitch_joint',    #25  <->26
+  'right_wrist_pitch_joint',   #26  <->25
+  'left_wrist_roll_joint',     #27  <->28 negate
+  'right_wrist_roll_joint',    #28  <->27 negate
 ]
 """
 
@@ -156,18 +156,25 @@ def _transform_actions_left_right(actions: torch.Tensor) -> torch.Tensor:
 
 
 def _switch_joints_left_right(joint_data: torch.Tensor) -> torch.Tensor:
-    """Left-right symmetry for 29-DOF X1 joint data."""
+    """Left-right symmetry for 29-DOF X1 joint data (runtime order)."""
     joint_data_switched = joint_data.clone()
 
-    # left indices <-> right indices
-    left_idx  = [1, 4, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27]
-    right_idx = [2, 5, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28]
+    # left indices <-> right indices (based on runtime BFS order)
+    left_idx  = [0, 3, 6, 9, 10, 13, 14, 17, 18, 21, 23, 25, 27]
+    right_idx = [2, 5, 8, 12, 11, 16, 15, 20, 19, 22, 24, 26, 28]
 
     joint_data_switched[..., left_idx] = joint_data[..., right_idx]
     joint_data_switched[..., right_idx] = joint_data[..., left_idx]
 
     # negate yaw/roll joints (including self-symmetric lumbar yaw/roll)
-    negate_idx = [0, 3, 4, 5, 7, 8, 13, 14, 17, 18, 19, 20, 23, 24, 27, 28]
+    # Runtime indices: lumbar_yaw=1, lumbar_roll=4,
+    # left_hip_roll=3, right_hip_roll=5, left_hip_yaw=6, right_hip_yaw=8,
+    # left_shoulder_roll=14, right_shoulder_roll=15,
+    # left_shoulder_yaw=18, right_shoulder_yaw=19,
+    # left_ankle_roll=17, right_ankle_roll=20,
+    # left_elbow_yaw=23, right_elbow_yaw=24,
+    # left_wrist_roll=27, right_wrist_roll=28
+    negate_idx = [1, 4, 3, 5, 6, 8, 14, 15, 17, 18, 19, 20, 23, 24, 27, 28]
     joint_data_switched[..., negate_idx] = -1 * joint_data_switched[..., negate_idx]
 
     return joint_data_switched

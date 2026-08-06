@@ -30,28 +30,29 @@ gmr_dof_names:
   - right_elbow_pitch_joint
   - right_elbow_yaw_joint
 
-# DOF names in Isaac Lab order for X1 (29 DOF, BFS articulation traversal)
+# DOF names in Isaac Lab order for X1 (29 DOF, runtime BFS articulation traversal)
+# This order is VERIFIED from gradmotion retarget run - DO NOT change without re-running retarget.
 lab_dof_names:
-  - lumbar_yaw_joint
   - left_hip_pitch_joint
+  - lumbar_yaw_joint
   - right_hip_pitch_joint
-  - lumbar_roll_joint
   - left_hip_roll_joint
+  - lumbar_roll_joint
   - right_hip_roll_joint
-  - lumbar_pitch_joint
   - left_hip_yaw_joint
+  - lumbar_pitch_joint
   - right_hip_yaw_joint
+  - left_knee_pitch_joint
   - left_shoulder_pitch_joint
   - right_shoulder_pitch_joint
-  - left_knee_pitch_joint
   - right_knee_pitch_joint
+  - left_ankle_pitch_joint
   - left_shoulder_roll_joint
   - right_shoulder_roll_joint
-  - left_ankle_pitch_joint
   - right_ankle_pitch_joint
+  - left_ankle_roll_joint
   - left_shoulder_yaw_joint
   - right_shoulder_yaw_joint
-  - left_ankle_roll_joint
   - right_ankle_roll_joint
   - left_elbow_pitch_joint
   - right_elbow_pitch_joint
