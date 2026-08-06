@@ -1,0 +1,99 @@
+# X1 retargeting config: maps GMR (rpo-format) motion data to X1's 29-DOF structure.
+#
+# The GMR motion data was captured for the roboparty (rpo) robot (23 DOF).
+# X1 has 29 DOF. The 6 extra DOFs (lumbar_yaw, lumbar_roll, 2x wrist) are
+# set to their default (0) during retargeting.
+
+# DOF names in the GMR pkl files (rpo robot order, 23 DOF)
+gmr_dof_names:
+  - left_thigh_yaw_joint
+  - left_thigh_roll_joint
+  - left_thigh_pitch_joint
+  - left_knee_joint
+  - left_ankle_pitch_joint
+  - left_ankle_roll_joint
+  - right_thigh_yaw_joint
+  - right_thigh_roll_joint
+  - right_thigh_pitch_joint
+  - right_knee_joint
+  - right_ankle_pitch_joint
+  - right_ankle_roll_joint
+  - torso_joint
+  - left_arm_pitch_joint
+  - left_arm_roll_joint
+  - left_arm_yaw_joint
+  - left_elbow_pitch_joint
+  - left_elbow_yaw_joint
+  - right_arm_pitch_joint
+  - right_arm_roll_joint
+  - right_arm_yaw_joint
+  - right_elbow_pitch_joint
+  - right_elbow_yaw_joint
+
+# DOF names in Isaac Lab order for X1 (29 DOF, BFS articulation traversal)
+lab_dof_names:
+  - lumbar_yaw_joint
+  - left_hip_pitch_joint
+  - right_hip_pitch_joint
+  - lumbar_roll_joint
+  - left_hip_roll_joint
+  - right_hip_roll_joint
+  - lumbar_pitch_joint
+  - left_hip_yaw_joint
+  - right_hip_yaw_joint
+  - left_shoulder_pitch_joint
+  - right_shoulder_pitch_joint
+  - left_knee_pitch_joint
+  - right_knee_pitch_joint
+  - left_shoulder_roll_joint
+  - right_shoulder_roll_joint
+  - left_ankle_pitch_joint
+  - right_ankle_pitch_joint
+  - left_shoulder_yaw_joint
+  - right_shoulder_yaw_joint
+  - left_ankle_roll_joint
+  - right_ankle_roll_joint
+  - left_elbow_pitch_joint
+  - right_elbow_pitch_joint
+  - left_elbow_yaw_joint
+  - right_elbow_yaw_joint
+  - left_wrist_pitch_joint
+  - right_wrist_pitch_joint
+  - left_wrist_roll_joint
+  - right_wrist_roll_joint
+
+# Mapping from GMR (rpo) joint names to X1 joint names.
+# DOFs not listed here (lumbar_yaw, lumbar_roll, wrists) will be set to default (0).
+gmr_to_lab_name_map:
+  left_thigh_yaw_joint: left_hip_yaw_joint
+  left_thigh_roll_joint: left_hip_roll_joint
+  left_thigh_pitch_joint: left_hip_pitch_joint
+  left_knee_joint: left_knee_pitch_joint
+  left_ankle_pitch_joint: left_ankle_pitch_joint
+  left_ankle_roll_joint: left_ankle_roll_joint
+  right_thigh_yaw_joint: right_hip_yaw_joint
+  right_thigh_roll_joint: right_hip_roll_joint
+  right_thigh_pitch_joint: right_hip_pitch_joint
+  right_knee_joint: right_knee_pitch_joint
+  right_ankle_pitch_joint: right_ankle_pitch_joint
+  right_ankle_roll_joint: right_ankle_roll_joint
+  torso_joint: lumbar_pitch_joint
+  left_arm_pitch_joint: left_shoulder_pitch_joint
+  left_arm_roll_joint: left_shoulder_roll_joint
+  left_arm_yaw_joint: left_shoulder_yaw_joint
+  left_elbow_pitch_joint: left_elbow_pitch_joint
+  left_elbow_yaw_joint: left_elbow_yaw_joint
+  right_arm_pitch_joint: right_shoulder_pitch_joint
+  right_arm_roll_joint: right_shoulder_roll_joint
+  right_arm_yaw_joint: right_shoulder_yaw_joint
+  right_elbow_pitch_joint: right_elbow_pitch_joint
+  right_elbow_yaw_joint: right_elbow_yaw_joint
+
+# Key body names for X1 (must match the names in the X1 robot model)
+lab_key_body_names:
+  - left_ankle_roll_link
+  - right_ankle_roll_link
+  - left_knee_pitch_link
+  - right_knee_pitch_link
+  - left_elbow_yaw_link
+  - right_elbow_yaw_link
