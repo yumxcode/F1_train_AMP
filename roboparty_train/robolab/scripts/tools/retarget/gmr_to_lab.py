@@ -341,15 +341,17 @@ def run_simulator(
 class ReplayMotionsSceneCfg(InteractiveSceneCfg):
     """Configuration for a replay motions scene."""
 
-    # ground plane
-    ground = AssetBaseCfg(prim_path="/World/defaultGroundPlane", spawn=sim_utils.GroundPlaneCfg())
+    # ground plane - use simple plane without physics material for retarget
+    # (retarget only needs kinematic replay, no physics interaction)
+    ground = AssetBaseCfg(prim_path="/World/defaultGroundPlane", spawn=sim_utils.GroundPlaneCfg(
+        physics_material=None,
+    ))
 
-    # lights
+    # lights - no texture_file to avoid Nucleus dependency in offline mode
     sky_light = AssetBaseCfg(
         prim_path="/World/skyLight",
         spawn=sim_utils.DomeLightCfg(
             intensity=750.0,
-            texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
         ),
     )
 
